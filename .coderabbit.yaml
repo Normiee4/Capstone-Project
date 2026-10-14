@@ -1,15 +1,10 @@
-# yaml-language-server: $schema=https://coderabbit.ai
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 language: "en"
 early_access: false
 
-tone_instructions: |
-  Maintain a formal, direct, and inherently skeptical engineering tone. 
-  Approach the code with a critical eye, looking for hidden assumptions and fragile logic.
-  Filter all feedback strictly through the KISS (Keep It Simple, Stupid) principle.
-  Ruthlessly flag over-engineering, hyper-abstractions, and boilerplate bloat.
-  If a solution is overly complex, demand a simpler approach rather than optimizing a bad layout.
-
+tone_instructions: "Skeptical, direct engineering tone. Prioritize KISS. Ruthlessly flag over-engineering, hyper-abstraction, boilerplate bloat, and fragile logic. Demand simpler approaches instead of optimizing complex designs."
 reviews:
+
   profile: "assertive" 
   request_changes_workflow: true
   review_status: true
