@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>iFixz Workspace — Admin onboarding</title>
+<meta name="description" content="iFixz Co. design documentation: first-session onboarding user flow and onboarding UI screens for a new Organization Admin.">
+<link rel="stylesheet" href="css/docs.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow">iFixz Co. — design documentation</p>
+  <h1>Admin onboarding</h1>
+  <p class="lead">The first-session journey for a brand-new Organization Admin: from sign-in to a running, backed-up workspace, with the onboarding UI screens that carry each step. The working prototype lives separately.</p>
+  <div class="doc-actions">
+    <a class="btn btn-primary" href="index.html">Open the live prototype</a>
+    <a class="btn btn-secondary" href="userflows.html">View the user flows</a>
+    <a class="btn btn-secondary" href="wireframes.html">View the wireframes</a>
+    <a class="btn btn-secondary" href="document.md">Read the PRD</a>
+  </div>
+</header>
+
+<section id="scenario">
+  <h2>1 · Onboarding scenario</h2>
+  <p class="sec-sub">Who onboards, what starts it, and what done means — the context the flow below runs in.</p>
+  <div class="mapgrid">
+    <article class="mapcard"><h3>Persona</h3><span class="route">role: Organization Admin</span><p>A brand-new admin in their first session; the role switcher stands in for real authentication.</p></article>
+    <article class="mapcard"><h3>Trigger</h3><span class="route">fresh sign-in</span><p>Workspace seeded with IMS and Sales Operation live; the four extra modules start deactivated.</p></article>
+    <article class="mapcard"><h3>Goal</h3><span class="route">zero to running</span><p>Modules live, pipeline rules defined, first clean run, backup scheduled — without leaving the workspace.</p></article>
+    <article class="mapcard"><h3>Done when</h3><span class="route">checklist 4 of 4</span><p>Setup checklist complete, attention list clear, activity feed showing the first run and the first snapshot.</p></article>
+  </div>
+</section>
+
+<section id="flow">
+  <h2>2 · Onboarding user flow</h2>
+  <p class="sec-sub">Three step chains for the first session: workspace check, first clean run with the reject branch, and analytics verification with backup scheduling.</p>
+
+  <article class="flowcard">
+    <div class="flow-head"><span class="flow-title">First sign-in &amp; workspace check</span><span class="chip admin">New Organization Admin</span><span class="route">#/overview &rarr; #/registry</span></div>
+    <ol class="steps">
+      <li class="step"><b>01</b><span>First sign-in</span><span class="note">Lands on Overview with the setup checklist</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>02</b><span>Confirm the role</span><span class="note">Account menu shows Organization Admin</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>03</b><span>Open Module registry</span><span class="note">IMS and Sales Operation already active</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="branch">
+        <div class="step"><span class="tag ok">Need more</span><span>Activate a deactivated module, or run the 3-step register wizard and activate the result.</span></div>
+        <div class="step"><span class="tag warn">Enough</span><span>Keep the seeded two and move straight to validation rules.</span></div>
+      </li>
+    </ol>
+    <p class="flow-note"><strong>Rule:</strong> only Organization Admin sees the Register and Activate controls; activation takes effect without a code deploy.</p>
+  </article>
+
+  <article class="flowcard">
+    <div class="flow-head"><span class="flow-title">Rules &amp; first clean run</span><span class="chip admin">Org Admin</span><span class="route">#/pipeline</span></div>
+    <ol class="steps">
+      <li class="step"><b>01</b><span>Open Data pipeline</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>02</b><span>Select the module</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>03</b><span>Review validation rules</span><span class="note">Required, format, duplicates, allowed values</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>04</b><span>Run the pipeline</span><span class="note">Intake &rarr; clean &rarr; validate &rarr; load &rarr; report</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="branch">
+        <div class="step"><span class="tag ok">All pass</span><span>Stats confirm a clean run; the checklist ticks first run.</span></div>
+        <div class="step"><span class="tag bad">Rejected</span><span>Triage the store, fix the source, then Retry or Discard with a log entry.</span></div>
+      </li>
+    </ol>
+    <p class="flow-note"><strong>Rule:</strong> every record passes the pipeline first; failures land in the rejected store with the failing rule named and are never dropped silently.</p>
+  </article>
+
+  <article class="flowcard">
+    <div class="flow-head"><span class="flow-title">Verify analytics &amp; protect the data</span><span class="chip">All roles read</span><span class="chip admin">Org Admin configures</span><span class="route">#/module/:id &rarr; #/backups</span></div>
+    <ol class="steps">
+      <li class="step"><b>01</b><span>Module dashboard</span><span class="note">KPIs, trend, domain panel</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>02</b><span>Records &rarr; Add record</span><span class="note">Native modules; validates on blur</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>03</b><span>Set schedule &amp; retention</span><span class="note">Backups screen, Org Admin only</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>04</b><span>Run backup now</span><span class="note">First snapshot lands in history</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>05</b><span>Back to Overview</span><span class="note">Checklist 4 of 4, attention list clear</span></li>
+    </ol>
+    <p class="flow-note"><strong>Rule:</strong> restores stay confirmation-gated and log-only in the prototype; onboarding ends when the checklist completes.</p>
+  </article>
+</section>
+
+<section id="ui">
+  <h2>3 · Onboarding UI</h2>
+  <p class="sec-sub">Low-fidelity screens for the first-run experience: the setup checklist on Overview, module activation, the guided pipeline run, and backup scheduling. These are design proposals for the onboarding layer; the running prototype is unchanged.</p>
+  <div class="legend">
+    <span><i class="sw"></i> content region</span>
+    <span><i class="sw s2"></i> data / placeholder text</span>
+    <span><i class="sw s3"></i> emphasis / primary action</span>
+  </div>
+
+  <div class="wf-cap"><span class="t">First-run Overview</span><span class="route">#/overview &middot; day 1</span><span class="chip admin">Organization Admin</span></div>
+  <div class="wf">
+    <div class="wf-main">
+      <div class="wf-top"><div class="wf-title"></div><div class="wf-spacer"></div><span class="wf-pill"><span class="dot"></span> Postgres: connected</span><span class="wf-avatar"></span></div>
+      <div class="wf-body">
+        <span class="wf-lbl">welcome &middot; get started checklist</span>
+        <div class="wf-block">
+          <span class="cap">Welcome to your workspace</span>
+          <div class="line w60"></div>
+          <span class="cap">4 setup tasks &middot; 1 of 4 done</span>
+        </div>
+        <div class="wf-stages">
+          <div class="wf-stage done">1 Modules live</div>
+          <div class="wf-stage">2 Rules set</div>
+          <div class="wf-stage">3 First run</div>
+          <div class="wf-stage">4 Backup</div>
+          <div class="wf-stage">Ready</div>
+        </div>
+        <div class="wf-bar"><span class="wf-btn pri">Go to module registry</span><span class="wf-btn">Skip for now</span></div>
+        <span class="wf-lbl">setup tasks surface in attention &middot; runs surface in activity</span>
+        <div class="wf-row2">
+          <div class="wf-block"><span class="cap">attention list &middot; next setup task</span><div class="line"></div><div class="line w60"></div></div>
+          <div class="wf-block"><span class="cap">activity feed &middot; first pipeline run logs here</span><div class="line"></div><div class="line w40"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-cap"><span class="t">Activate a module</span><span class="route">#/registry</span><span class="chip admin">Org Admin only</span></div>
+  <div class="wf">
+    <div class="wf-main">
+      <div class="wf-top"><div class="wf-title"></div><div class="wf-spacer"></div><span class="wf-btn pri">Register module</span></div>
+      <div class="wf-body">
+        <div class="wf-bar">
+          <span class="wf-input">search modules</span>
+          <span class="wf-select">filter: status</span>
+        </div>
+        <div class="wf-table">
+          <div class="wf-tr head"><span class="wf-th">module</span><span class="wf-th">type</span><span class="wf-th">status</span><span class="wf-th">action</span></div>
+          <div class="wf-tr"><span class="wf-td">IMS</span><span class="wf-td">native</span><span class="wf-td">active</span><span class="wf-td">deactivate</span></div>
+          <div class="wf-tr"><span class="wf-td">Sales Operation</span><span class="wf-td">native</span><span class="wf-td">active</span><span class="wf-td">deactivate</span></div>
+          <div class="wf-tr"><span class="wf-td">Billing API</span><span class="wf-td">external</span><span class="wf-td">inactive</span><span class="wf-td">activate</span></div>
+        </div>
+        <span class="wf-lbl">confirmation &middot; no code deploy</span>
+        <div class="wf-overlay">
+          <div class="wf-dialog">
+            <span class="cap">Activate Billing API?</span>
+            <div class="line w60"></div>
+            <div class="row"><span class="wf-btn">Cancel</span><span class="wf-btn pri">Activate</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-cap"><span class="t">Guided first run</span><span class="route">#/pipeline</span><span class="chip admin">Org Admin edits &middot; others read</span></div>
+  <div class="wf">
+    <div class="wf-main">
+      <div class="wf-top"><div class="wf-title"></div><div class="wf-spacer"></div><span class="wf-avatar"></span></div>
+      <div class="wf-body">
+        <span class="wf-lbl">checklist step 3 &middot; run highlighted</span>
+        <div class="wf-bar">
+          <span class="wf-select">module selector</span>
+          <span class="wf-btn pri">Run pipeline</span>
+          <span class="wf-btn">Bulk upload</span>
+        </div>
+        <div class="wf-stages">
+          <div class="wf-stage done">Intake</div>
+          <div class="wf-stage done">Clean</div>
+          <div class="wf-stage done">Validate</div>
+          <div class="wf-stage done">Load</div>
+          <div class="wf-stage">Report</div>
+        </div>
+        <div class="wf-row4">
+          <div class="wf-block"><span class="cap">passed</span><span class="val">1,204</span></div>
+          <div class="wf-block"><span class="cap">rejected</span><span class="val">18</span></div>
+          <div class="wf-block"><span class="cap">queued</span><span class="val">62</span></div>
+          <div class="wf-block"><span class="cap">last run</span><span class="val">2m</span></div>
+        </div>
+        <span class="wf-lbl">rejected records &middot; failing rule named</span>
+        <div class="wf-table">
+          <div class="wf-tr head"><span class="wf-th">record</span><span class="wf-th">module</span><span class="wf-th">failing rule</span><span class="wf-th">action</span></div>
+          <div class="wf-tr"><span class="wf-td">INV-2081</span><span class="wf-td">Billing API</span><span class="wf-td">email format</span><span class="wf-td">retry / discard</span></div>
+          <div class="wf-tr"><span class="wf-td">USR-0043</span><span class="wf-td">IMS</span><span class="wf-td">duplicate key</span><span class="wf-td">retry / discard</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-cap"><span class="t">Schedule the first backup</span><span class="route">#/backups</span><span class="chip admin">Org Admin only</span></div>
+  <div class="wf">
+    <div class="wf-main">
+      <div class="wf-top"><div class="wf-title"></div><div class="wf-spacer"></div><span class="wf-btn pri">Run backup now</span></div>
+      <div class="wf-body">
+        <div class="wf-row2">
+          <div class="wf-block"><span class="cap">schedule &amp; retention</span><div class="line"></div><div class="line w60"></div></div>
+          <div class="wf-block"><span class="cap">next scheduled run</span><span class="val">03:00</span></div>
+        </div>
+        <span class="wf-lbl">snapshot history &middot; first backup lands here</span>
+        <div class="wf-table">
+          <div class="wf-tr head"><span class="wf-th">snapshot</span><span class="wf-th">taken</span><span class="wf-th">size</span><span class="wf-th">action</span></div>
+          <div class="wf-tr"><span class="wf-td">bk-0001</span><span class="wf-td">just now</span><span class="wf-td">142 MB</span><span class="wf-td">restore</span></div>
+        </div>
+        <span class="wf-lbl">restore stays confirmation-gated</span>
+        <div class="wf-overlay">
+          <div class="wf-dialog">
+            <span class="cap">Restore snapshot bk-0001?</span>
+            <div class="line w60"></div>
+            <div class="row"><span class="wf-btn">Cancel</span><span class="wf-btn pri">Restore</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="doc">
+  <a class="btn btn-secondary" href="userflows.html">View the user flows</a>
+  <span>Design documentation only — this page is not part of the application. Roles: Department Employee, Organization Admin, Client Super Admin.</span>
+</footer>
+
+</div>
+</body>
+</html>

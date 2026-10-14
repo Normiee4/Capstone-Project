@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>iFixz Workspace — User flows</title>
+<meta name="description" content="iFixz Co. design documentation: platform map, role model, and step-by-step user flows for the centralized workspace prototype.">
+<link rel="stylesheet" href="css/docs.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow">iFixz Co. — design documentation</p>
+  <h1>User flows</h1>
+  <p class="lead">How each role moves through the centralized workspace platform: the platform map, the three roles, and a step chain for every job to be done — validation failures, rejected-record retry, unreachable sources, and deactivation included. The working prototype lives separately.</p>
+  <div class="doc-actions">
+    <a class="btn btn-primary" href="index.html">Open the live prototype</a>
+    <a class="btn btn-secondary" href="wireframes.html">View the wireframes</a>
+    <a class="btn btn-secondary" href="onboarding.html">View the onboarding flow</a>
+    <a class="btn btn-secondary" href="document.md">Read the PRD</a>
+  </div>
+</header>
+
+<section id="map">
+  <h2>1 · Platform map</h2>
+  <p class="sec-sub">One shell, seven screens. Every module — IMS, Sales Operation, Billing API, Support Desk, Payroll Export, CRM Mirror — renders through the same module screens.</p>
+  <div class="mapgrid">
+    <article class="mapcard"><h3>Overview</h3><span class="route">#/overview</span><p>Shared metrics across all modules, per-module cards, attention list, activity feed.</p></article>
+    <article class="mapcard"><h3>Data pipeline</h3><span class="route">#/pipeline</span><p>Per-module validation rules, staged runs, rejected-records store with retry.</p></article>
+    <article class="mapcard"><h3>Module registry</h3><span class="route">#/registry</span><p>Manifest wizard, adapters, activate / deactivate without a deploy.</p></article>
+    <article class="mapcard"><h3>Module dashboard</h3><span class="route">#/module/:id</span><p>KPIs, trend, group chart, domain panel — same renderer for every module.</p></article>
+    <article class="mapcard"><h3>Records</h3><span class="route">#/module/:id/records</span><p>Schema table, search and filters, add-record form, CSV export.</p></article>
+    <article class="mapcard"><h3>Backups &amp; restore</h3><span class="route">#/backups</span><p>Schedule, retention, snapshot history, confirmation-gated restore.</p></article>
+    <article class="mapcard"><h3>Sign-in &amp; roles</h3><span class="route">account menu</span><p>Role switcher standing in for authentication; permissions follow the role.</p></article>
+    <article class="mapcard"><h3>Rejected store</h3><span class="route">inside #/pipeline</span><p>Failed records kept with the failing rule named — never discarded silently.</p></article>
+  </div>
+  <div class="roles">
+    <article class="rolecard"><span class="chip">Department Employee</span><p>Reads every dashboard; enters records in native modules only. External modules stay view-only.</p></article>
+    <article class="rolecard"><span class="chip admin">Organization Admin</span><p>Configures pipeline rules, registers and activates modules, runs and restores backups.</p></article>
+    <article class="rolecard"><span class="chip">Client Super Admin</span><p>Read-only oversight across all modules, pipelines, and backup history.</p></article>
+  </div>
+</section>
+
+<section id="flows">
+  <h2>2 · User flows</h2>
+  <p class="sec-sub">Step chains for every job to be done, covering all three roles and the edge paths: validation failures, rejected-record retry, unreachable sources, and deactivation.</p>
+
+  <article class="flowcard">
+    <div class="flow-head"><span class="flow-title">Sign in &amp; switch role</span><span class="chip">All roles</span><span class="route">#/overview</span></div>
+    <ol class="steps">
+      <li class="step"><b>01</b><span>Open the workspace</span><span class="note">Lands on Overview</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>02</b><span>Account menu (top right)</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>03</b><span>Pick a role</span><span class="note">Employee / Org Admin / Super Admin</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>04</b><span>Permissions update</span><span class="note">Admin-only controls appear or disable</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>05</b><span>Work in any tab</span></li>
+    </ol>
+    <p class="flow-note"><strong>Rule:</strong> the role switcher stands in for real authentication; registry, rule, and backup actions are Organization Admin only.</p>
+  </article>
+
+  <article class="flowcard">
+    <div class="flow-head"><span class="flow-title">Enter data in a native module</span><span class="chip">Employee</span><span class="chip admin">Org Admin</span><span class="route">#/module/ims &rarr; records</span></div>
+    <ol class="steps">
+      <li class="step"><b>01</b><span>Open a native module</span><span class="note">IMS or Sales Operation</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>02</b><span>Records tab &rarr; Add record</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>03</b><span>Fill the form</span><span class="note">Validates on blur</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="branch">
+        <div class="step"><span class="tag ok">Pass</span><span>Record queues for the pipeline and lands in the dashboard after the run.</span></div>
+        <div class="step"><span class="tag bad">Fail</span><span>Error beside the field with the cause and remedy; nothing is queued.</span></div>
+      </li>
+    </ol>
+    <p class="flow-note"><strong>Rule:</strong> native-module users may input data; external modules (Billing API, Support Desk, Payroll Export, CRM Mirror) show a read-only notice instead of the form.</p>
+  </article>
+
+  <article class="flowcard">
+    <div class="flow-head"><span class="flow-title">Clean &amp; validate inbound data</span><span class="chip admin">Org Admin</span><span class="route">#/pipeline</span></div>
+    <ol class="steps">
+      <li class="step"><b>01</b><span>Open Data pipeline</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>02</b><span>Select the module</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>03</b><span>Edit validation rules</span><span class="note">Required, format, duplicates, allowed values</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>04</b><span>Run the pipeline</span><span class="note">Intake &rarr; clean &rarr; validate &rarr; load &rarr; report</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>05</b><span>Read run stats</span><span class="note">Passed / rejected counts</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="branch">
+        <div class="step"><span class="tag ok">Rejected</span><span>Record kept in the store with the failing rule named.</span></div>
+        <div class="step"><span class="tag warn">Next</span><span>Fix the source &rarr; Retry, or Discard with a log entry.</span></div>
+      </li>
+    </ol>
+    <p class="flow-note"><strong>Rule:</strong> every record — native input, bulk upload, external sync — passes through the pipeline first; failures are never dropped silently.</p>
+  </article>
+
+  <article class="flowcard">
+    <div class="flow-head"><span class="flow-title">Register &amp; activate a module</span><span class="chip admin">Org Admin</span><span class="route">#/registry</span></div>
+    <ol class="steps">
+      <li class="step"><b>01</b><span>Open Module registry</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>02</b><span>Register &middot; step 1</span><span class="note">Identity, routes, permissions</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>03</b><span>Register &middot; step 2</span><span class="note">Adapter File / DB / API / Webhook, connection, field mapping, sync mode</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>04</b><span>Register &middot; step 3</span><span class="note">Pipeline rules, dashboard config</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>05</b><span>Submit as inactive</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>06</b><span>Activate</span><span class="note">Sidebar entry, routing, permissions — no code deploy</span></li>
+    </ol>
+    <p class="flow-note"><strong>Branch:</strong> Deactivate hides the entry and stops sync while keeping its data. <strong>Rule:</strong> only Organization Admin sees the Register and Activate controls.</p>
+  </article>
+
+  <article class="flowcard">
+    <div class="flow-head"><span class="flow-title">Read the analytics</span><span class="chip">All roles</span><span class="route">#/overview &rarr; #/module/:id</span></div>
+    <ol class="steps">
+      <li class="step"><b>01</b><span>Overview</span><span class="note">Shared metrics across modules</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>02</b><span>Pick a module card</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>03</b><span>Module dashboard</span><span class="note">KPIs, trend, group chart, domain panel</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>04</b><span>All records</span><span class="note">Filter, page, export CSV</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>05</b><span>Back to Overview</span></li>
+    </ol>
+    <p class="flow-note"><strong>Rule:</strong> dashboards are served from cached per-module analytics; native and external modules render through the same component.</p>
+  </article>
+
+  <article class="flowcard">
+    <div class="flow-head"><span class="flow-title">External sync &amp; stale source</span><span class="chip admin">Org Admin configures</span><span class="chip">All roles read</span><span class="route">#/module/crm-mirror</span></div>
+    <ol class="steps">
+      <li class="step"><b>01</b><span>Adapter syncs</span><span class="note">Real-time where supported, batch otherwise</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>02</b><span>Source reachable?</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="branch">
+        <div class="step"><span class="tag ok">Yes</span><span>Fresh rows load with an updated last-synced timestamp.</span></div>
+        <div class="step"><span class="tag bad">No</span><span>Last synced snapshot keeps serving behind a stale-source banner.</span></div>
+      </li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>03</b><span>Read-only view</span><span class="note">Input attempts show a view-only notice</span></li>
+    </ol>
+    <p class="flow-note"><strong>Rule:</strong> the workspace never writes back to an external source system; availability beats strict consistency when a source is unreachable.</p>
+  </article>
+
+  <article class="flowcard">
+    <div class="flow-head"><span class="flow-title">Backup &amp; restore</span><span class="chip admin">Org Admin</span><span class="route">#/backups</span></div>
+    <ol class="steps">
+      <li class="step"><b>01</b><span>Open Backups</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>02</b><span>Set schedule &amp; retention</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>03</b><span>Snapshot taken</span><span class="note">Scheduled or Run now</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>04</b><span>Pick from history</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>05</b><span>Restore &rarr; confirm</span><span class="note">Destructive action, second step required</span></li>
+      <li class="arrow" aria-hidden="true">&rarr;</li>
+      <li class="step"><b>06</b><span>Restored</span><span class="note">Log-only in the prototype</span></li>
+    </ol>
+    <p class="flow-note"><strong>Rule:</strong> only Organization Admin may configure the schedule, take snapshots, or restore; every other role sees history read-only.</p>
+  </article>
+</section>
+
+<footer class="doc">
+  <a class="btn btn-secondary" href="wireframes.html">View the wireframes</a>
+  <span>Design documentation only — this page is not part of the application. Roles: Department Employee, Organization Admin, Client Super Admin.</span>
+</footer>
+
+</div>
+</body>
+</html>

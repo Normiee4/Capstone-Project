@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>iFixz Workspace — Wireframes</title>
+<meta name="description" content="iFixz Co. design documentation: low-fidelity wireframes for every screen of the centralized workspace prototype.">
+<link rel="stylesheet" href="css/docs.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow">iFixz Co. — design documentation</p>
+  <h1>Wireframes</h1>
+  <p class="lead">What every screen contains at wireframe fidelity: grey blocks mark layout regions, labels show real content, and each frame notes who sees it. See the user flows page for how roles move through these screens. The working prototype lives separately.</p>
+  <div class="doc-actions">
+    <a class="btn btn-primary" href="index.html">Open the live prototype</a>
+    <a class="btn btn-secondary" href="userflows.html">View the user flows</a>
+    <a class="btn btn-secondary" href="onboarding.html">View the onboarding flow</a>
+    <a class="btn btn-secondary" href="document.md">Read the PRD</a>
+  </div>
+</header>
+
+<section id="wireframes">
+  <h2>Wireframes</h2>
+  <p class="sec-sub">Low-fidelity structure for every screen: grey blocks mark layout regions, labels show real content. Roles note who sees each screen.</p>
+  <div class="legend">
+    <span><i class="sw"></i> content region</span>
+    <span><i class="sw s2"></i> data / placeholder text</span>
+    <span><i class="sw s3"></i> emphasis / primary action</span>
+  </div>
+
+  <div class="wf-cap"><span class="t">App shell</span><span class="route">every route</span><span class="chip">All roles</span></div>
+  <div class="wf">
+    <div class="wf-shell">
+      <aside class="wf-side">
+        <div class="wf-brand"></div>
+        <div class="wf-group">Workspace</div>
+        <div class="wf-nav on">Overview</div>
+        <div class="wf-nav">Data pipeline</div>
+        <div class="wf-nav">Module registry</div>
+        <div class="wf-nav">Backups</div>
+        <div class="wf-group">Modules</div>
+        <div class="wf-nav">IMS</div>
+        <div class="wf-nav">Sales Operation</div>
+        <div class="wf-nav">Billing API</div>
+        <div class="wf-nav">Support Desk</div>
+        <div class="wf-nav">Payroll Export</div>
+        <div class="wf-nav">CRM Mirror</div>
+      </aside>
+      <div class="wf-main">
+        <div class="wf-top">
+          <div class="wf-title"></div>
+          <div class="wf-spacer"></div>
+          <span class="wf-pill"><span class="dot"></span> Postgres: connected</span>
+          <span class="wf-avatar"></span>
+        </div>
+        <div class="wf-body">
+          <span class="wf-lbl">page heading &middot; subtitle</span>
+          <div class="wf-row3">
+            <div class="wf-block"><span class="cap">content region</span><div class="line w60"></div></div>
+            <div class="wf-block"><span class="cap">content region</span><div class="line w40"></div></div>
+            <div class="wf-block"><span class="cap">content region</span><div class="line w60"></div></div>
+          </div>
+          <span class="wf-lbl">sidebar is fixed on desktop &middot; collapses to a top strip below 768px</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-cap"><span class="t">Overview</span><span class="route">#/overview</span><span class="chip">All roles</span></div>
+  <div class="wf">
+    <div class="wf-main">
+      <div class="wf-top"><div class="wf-title"></div><div class="wf-spacer"></div><span class="wf-pill"><span class="dot"></span> 6 modules</span><span class="wf-avatar"></span></div>
+      <div class="wf-body">
+        <div class="wf-row4">
+          <div class="wf-block"><span class="cap">shared metric</span><span class="val">12.4k</span></div>
+          <div class="wf-block"><span class="cap">shared metric</span><span class="val">98.2%</span></div>
+          <div class="wf-block"><span class="cap">shared metric</span><span class="val">37</span></div>
+          <div class="wf-block"><span class="cap">shared metric</span><span class="val">2 min</span></div>
+        </div>
+        <span class="wf-lbl">module cards</span>
+        <div class="wf-row3">
+          <div class="wf-block"><div class="line w40"></div><span class="cap">module &middot; status &middot; 2 metrics</span></div>
+          <div class="wf-block"><div class="line w60"></div><span class="cap">module &middot; status &middot; 2 metrics</span></div>
+          <div class="wf-block"><div class="line w40"></div><span class="cap">module &middot; stale banner</span></div>
+        </div>
+        <div class="wf-row2">
+          <div class="wf-block"><span class="cap">attention list &middot; needs action</span><div class="line"></div><div class="line w60"></div></div>
+          <div class="wf-block"><span class="cap">activity feed &middot; recent runs</span><div class="line"></div><div class="line w40"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-cap"><span class="t">Data pipeline</span><span class="route">#/pipeline?module=id</span><span class="chip admin">Org Admin edits &middot; others read</span></div>
+  <div class="wf">
+    <div class="wf-main">
+      <div class="wf-top"><div class="wf-title"></div><div class="wf-spacer"></div><span class="wf-avatar"></span></div>
+      <div class="wf-body">
+        <div class="wf-bar">
+          <span class="wf-select">module selector</span>
+          <span class="wf-btn pri">Run pipeline</span>
+          <span class="wf-btn">Bulk upload</span>
+        </div>
+        <div class="wf-stages">
+          <div class="wf-stage done">Intake</div>
+          <div class="wf-stage done">Clean</div>
+          <div class="wf-stage done">Validate</div>
+          <div class="wf-stage done">Load</div>
+          <div class="wf-stage">Report</div>
+        </div>
+        <div class="wf-row4">
+          <div class="wf-block"><span class="cap">passed</span><span class="val">1,204</span></div>
+          <div class="wf-block"><span class="cap">rejected</span><span class="val">18</span></div>
+          <div class="wf-block"><span class="cap">queued</span><span class="val">62</span></div>
+          <div class="wf-block"><span class="cap">last run</span><span class="val">2m</span></div>
+        </div>
+        <span class="wf-lbl">validation rules &middot; toggles</span>
+        <div class="wf-block"><div class="line"></div><div class="line w60"></div><div class="line w40"></div></div>
+        <span class="wf-lbl">rejected records &middot; failing rule named</span>
+        <div class="wf-table">
+          <div class="wf-tr head"><span class="wf-th">record</span><span class="wf-th">module</span><span class="wf-th">failing rule</span><span class="wf-th">action</span></div>
+          <div class="wf-tr"><span class="wf-td">INV-2081</span><span class="wf-td">Billing API</span><span class="wf-td">email format</span><span class="wf-td">retry / discard</span></div>
+          <div class="wf-tr"><span class="wf-td">USR-0043</span><span class="wf-td">IMS</span><span class="wf-td">duplicate key</span><span class="wf-td">retry / discard</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-cap"><span class="t">Module registry &amp; register wizard</span><span class="route">#/registry</span><span class="chip admin">Org Admin only</span></div>
+  <div class="wf">
+    <div class="wf-main">
+      <div class="wf-top"><div class="wf-title"></div><div class="wf-spacer"></div><span class="wf-btn pri">Register module</span></div>
+      <div class="wf-body">
+        <div class="wf-bar">
+          <span class="wf-input">search modules</span>
+          <span class="wf-select">filter: type</span>
+          <span class="wf-select">filter: status</span>
+        </div>
+        <div class="wf-table">
+          <div class="wf-tr head"><span class="wf-th">module</span><span class="wf-th">type</span><span class="wf-th">adapter</span><span class="wf-th">status</span></div>
+          <div class="wf-tr"><span class="wf-td">IMS</span><span class="wf-td">native</span><span class="wf-td">internal</span><span class="wf-td">active</span></div>
+          <div class="wf-tr"><span class="wf-td">Billing API</span><span class="wf-td">external</span><span class="wf-td">API</span><span class="wf-td">active</span></div>
+          <div class="wf-tr"><span class="wf-td">CRM Mirror</span><span class="wf-td">external</span><span class="wf-td">Webhook</span><span class="wf-td">stale</span></div>
+        </div>
+        <span class="wf-lbl">wizard &middot; 1 identity &middot; 2 adapter &middot; 3 rules</span>
+        <div class="wf-block">
+          <div class="wf-bar">
+            <span class="wf-btn">1 Identity</span>
+            <span class="wf-btn pri">2 Adapter</span>
+            <span class="wf-btn">3 Rules</span>
+          </div>
+          <div class="line"></div>
+          <div class="line w60"></div>
+          <span class="cap">adapter: File / Database / API / Webhook &middot; connection &middot; field mapping &middot; sync mode</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-cap"><span class="t">Module dashboard</span><span class="route">#/module/:id</span><span class="chip">All roles read</span></div>
+  <div class="wf">
+    <div class="wf-main">
+      <div class="wf-top">
+        <div class="wf-title"></div>
+        <span class="wf-pill">external</span>
+        <span class="wf-pill"><span class="dot"></span> active</span>
+        <div class="wf-spacer"></div>
+        <span class="wf-pill">last synced 6m ago</span>
+        <span class="wf-avatar"></span>
+      </div>
+      <div class="wf-body">
+        <div class="wf-row4">
+          <div class="wf-block"><span class="cap">kpi</span><span class="val">842</span></div>
+          <div class="wf-block"><span class="cap">kpi</span><span class="val">96%</span></div>
+          <div class="wf-block"><span class="cap">kpi</span><span class="val">31</span></div>
+          <div class="wf-block"><span class="cap">kpi</span><span class="val">4.1d</span></div>
+        </div>
+        <span class="wf-lbl">domain panel &middot; schema-driven rows</span>
+        <div class="wf-table">
+          <div class="wf-tr head"><span class="wf-th">column a</span><span class="wf-th">column b</span><span class="wf-th">column c</span><span class="wf-th">column d</span></div>
+          <div class="wf-tr"><span class="wf-td">value</span><span class="wf-td">value</span><span class="wf-td">value</span><span class="wf-td">value</span></div>
+          <div class="wf-tr"><span class="wf-td">value</span><span class="wf-td">value</span><span class="wf-td">value</span><span class="wf-td">value</span></div>
+        </div>
+        <div class="wf-row2">
+          <div class="wf-block"><span class="cap">trend over time</span>
+            <div class="wf-bars"><i style="height:30%"></i><i style="height:55%"></i><i style="height:40%"></i><i style="height:70%"></i><i class="hi" style="height:90%"></i><i style="height:60%"></i></div>
+          </div>
+          <div class="wf-block"><span class="cap">grouped by category</span>
+            <div class="wf-bars"><i style="height:80%"></i><i style="height:50%"></i><i class="hi" style="height:95%"></i><i style="height:35%"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-cap"><span class="t">Records</span><span class="route">#/module/:id/records</span><span class="chip">Employee &amp; Admin input &middot; external read-only</span></div>
+  <div class="wf">
+    <div class="wf-main">
+      <div class="wf-top"><div class="wf-title"></div><div class="wf-spacer"></div><span class="wf-btn">Export CSV</span><span class="wf-btn pri">Add record</span></div>
+      <div class="wf-body">
+        <div class="wf-tabs">
+          <span class="wf-tab on">All records</span>
+          <span class="wf-tab">Queued</span>
+          <span class="wf-tab">Rejected</span>
+        </div>
+        <div class="wf-bar">
+          <span class="wf-input">search records</span>
+          <span class="wf-select">filter: status</span>
+          <span class="wf-select">filter: date</span>
+        </div>
+        <div class="wf-table">
+          <div class="wf-tr head"><span class="wf-th">id</span><span class="wf-th">field</span><span class="wf-th">status</span><span class="wf-th">updated</span></div>
+          <div class="wf-tr"><span class="wf-td">REC-1041</span><span class="wf-td">text</span><span class="wf-td">validated</span><span class="wf-td">2m ago</span></div>
+          <div class="wf-tr"><span class="wf-td">REC-1042</span><span class="wf-td">text</span><span class="wf-td">queued</span><span class="wf-td">5m ago</span></div>
+          <div class="wf-tr"><span class="wf-td">REC-1043</span><span class="wf-td">text</span><span class="wf-td">rejected</span><span class="wf-td">8m ago</span></div>
+        </div>
+        <div class="wf-bar"><span class="wf-lbl">page 1 of 9</span><span class="wf-btn">Prev</span><span class="wf-btn">Next</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-cap"><span class="t">Add record (validation on blur)</span><span class="route">#/module/:id/records</span><span class="chip">Native modules only</span></div>
+  <div class="wf">
+    <div class="wf-main">
+      <div class="wf-top"><div class="wf-title"></div><div class="wf-spacer"></div><span class="wf-avatar"></span></div>
+      <div class="wf-body">
+        <div class="wf-row2">
+          <div class="wf-block"><span class="cap">field &middot; valid</span><span class="wf-input">typed value</span></div>
+          <div class="wf-block"><span class="cap">field &middot; error</span><span class="wf-input">bad value</span><span class="cap" style="color:var(--danger-text)">must match email format &middot; remedy hint</span></div>
+        </div>
+        <div class="wf-row2">
+          <div class="wf-block"><span class="cap">field &middot; untouched</span><span class="wf-input">empty</span></div>
+          <div class="wf-block"><span class="cap">field &middot; required</span><span class="wf-input">value</span></div>
+        </div>
+        <div class="wf-bar"><span class="wf-btn pri">Save record</span><span class="wf-btn">Cancel</span><span class="wf-lbl">save disabled until valid</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-cap"><span class="t">Backups &amp; restore</span><span class="route">#/backups</span><span class="chip admin">Org Admin only</span></div>
+  <div class="wf">
+    <div class="wf-main">
+      <div class="wf-top"><div class="wf-title"></div><div class="wf-spacer"></div><span class="wf-btn pri">Run backup now</span></div>
+      <div class="wf-body">
+        <div class="wf-row2">
+          <div class="wf-block"><span class="cap">schedule &amp; retention</span><div class="line"></div><div class="line w60"></div></div>
+          <div class="wf-block"><span class="cap">next scheduled run</span><span class="val">03:00</span></div>
+        </div>
+        <span class="wf-lbl">snapshot history</span>
+        <div class="wf-table">
+          <div class="wf-tr head"><span class="wf-th">snapshot</span><span class="wf-th">taken</span><span class="wf-th">size</span><span class="wf-th">action</span></div>
+          <div class="wf-tr"><span class="wf-td">bk-0041</span><span class="wf-td">today 03:00</span><span class="wf-td">142 MB</span><span class="wf-td">restore</span></div>
+          <div class="wf-tr"><span class="wf-td">bk-0040</span><span class="wf-td">yesterday 03:00</span><span class="wf-td">141 MB</span><span class="wf-td">restore</span></div>
+        </div>
+        <span class="wf-lbl">restore &middot; confirmation required</span>
+        <div class="wf-overlay">
+          <div class="wf-dialog">
+            <span class="cap">Restore snapshot bk-0041?</span>
+            <div class="line w60"></div>
+            <div class="row"><span class="wf-btn">Cancel</span><span class="wf-btn pri">Restore</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="doc">
+  <a class="btn btn-secondary" href="userflows.html">View the user flows</a>
+  <span>Design documentation only — this page is not part of the application. Roles: Department Employee, Organization Admin, Client Super Admin.</span>
+</footer>
+
+</div>
+</body>
+</html>

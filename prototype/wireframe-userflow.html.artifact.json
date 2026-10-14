@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "wireframe-userflow.html",
+  "entry": "wireframe-userflow.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-10-04T12:10:44.403Z",
+  "updatedAt": "2026-10-04T12:10:44.403Z",
+  "metadata": {
+    "inferred": true,
+    "reconciled": true
+  }
+}

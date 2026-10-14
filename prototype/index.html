@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>iFixz Workspace — Centralized Digital Workspace (Prototype)</title>
+    <meta
+      name="description"
+      content="First-phase interactive prototype of the iFixz Co. centralized workspace platform: ETL data pipeline, application module registry, shared-metrics overview and per-module dashboards."
+    />
+
+    <!-- Structure-only primitives. Product CSS outside the layer always wins. -->
+    <style>
+      /* OD-LAYOUT-PRIMITIVES v1 — structure only: display, flex/grid, overflow, wrapping, ratio.
+         Put this @layer first; product CSS outside the layer always wins. */
+      @layer od-layout {
+        :where(.od-stack,.od-row,.od-row-top,.od-cluster,.od-grid,.od-field,.od-stat,.od-cell,.od-tile) > :where(*) { min-width: 0; }
+
+        /* containers */
+        .od-stack   { display: flex; flex-direction: column; gap: var(--od-gap, 8px); }
+        .od-row     { display: flex; align-items: center; gap: var(--od-gap, 8px); }
+        .od-row-top { display: flex; align-items: flex-start; gap: var(--od-gap, 8px); }
+        .od-cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--od-gap, 8px); }
+        .od-fill    { flex: 1 1 0; min-width: 0; }
+        .od-fixed   { flex: none; }
+        .od-grid    { display: grid; gap: var(--od-gap, 12px); grid-template-columns: repeat(var(--od-cols, 3), minmax(0, 1fr)); }
+
+        /* stacked information: each piece is its own line — never sibling inline spans */
+        .od-stat, .od-field, .od-cell { display: grid; gap: var(--od-gap, 2px); }
+        :where(.od-stat,.od-field,.od-cell) > :where(*) { display: block; }
+        .od-tile { display: grid; grid-template-rows: auto 1fr; }
+        :where(.od-tile) > :where(*) { display: block; }
+
+        /* media keeps its intrinsic ratio by default; never a distorted or cropped
+           cover by accident. height:auto lets the ratio win over an <img height="…">
+           attribute. Cropping to a uniform box is an explicit opt-in: set --od-ratio
+           AND add .od-media-cover together (per the core rule, only where a crop is
+           deliberate — tile thumbs, decorative fills — never on full-frame content). */
+        .od-media { display: block; width: 100%; height: auto; aspect-ratio: var(--od-ratio, auto); }
+        .od-media-cover { object-fit: cover; }
+
+        /* data text only — authored copy is rewritten to its budget instead */
+        .od-truncate { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        .od-clamp-2, .od-clamp-3 { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+        .od-clamp-2 { -webkit-line-clamp: 2; }
+        .od-clamp-3 { -webkit-line-clamp: 3; }
+        .od-lines-2 { min-height: calc(2 * 1.4em); }   /* block-level reservation for a shared baseline */
+        .od-nowrap  { white-space: nowrap; }           /* 数字+单位 · 价格+起 · 日期+星期 */
+        .od-keep    { word-break: keep-all; overflow-wrap: anywhere; } /* CJK labels break at spaces / <wbr> first */
+
+        /* screen skeleton (optional): bars take their own space, the middle scrolls — no padding guessed for chrome */
+        .od-screen { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; }
+        .od-scroll { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+
+        /* horizontal rail: the next item peeks at the edge; trailing room survives overflow */
+        .od-rail { display: flex; gap: var(--od-gap, 8px); overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none;
+                   padding-inline: var(--od-rail-pad, 16px); scroll-padding-inline: var(--od-rail-pad, 16px); }
+        .od-rail::-webkit-scrollbar { display: none; }
+        :where(.od-rail) > :where(*) { flex: none; scroll-snap-align: start; }
+        :where(.od-rail) > :where(:last-child) { margin-inline-end: var(--od-rail-pad, 16px); }
+
+        .od-spacer { flex: none; visibility: hidden; pointer-events: none; }
+        .od-touch  { min-width: 44px; min-height: 44px; }
+      }
+      /* /OD-LAYOUT-PRIMITIVES v1 */
+    </style>
+
+    <!-- Design system tokens (Cisco). Raw color values live only in this block. -->
+    <style>
+      :root {
+        /* --- design-systems/cisco/tokens.css (verbatim) --- */
+        --bg: #0f1720;
+        --surface: #1b2530;
+        --surface-warm: #243447;
+        --fg: #ffffff;
+        --fg-2: #e8ebf1;
+        --muted: #9e9ea2;
+        --meta: #64bbe3;
+        --border: #58585b;
+        --accent: #049fd9;
+        --accent-on: #001923;
+        --success: #6cc04a;
+        --warn: #ffcc00;
+        --danger: #cf2030;
+        --font-display: "CiscoSansTT", Inter, Arial, sans-serif;
+        --font-body: "CiscoSansTT", Inter, Arial, sans-serif;
+        --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --radius-lg: 28px;
+        --radius-pill: 9999px;
+        --motion-fast: 160ms;
+        --motion-base: 240ms;
+        --focus-ring: 0 0 0 4px rgba(100, 187, 227, 0.32);
+        --container-max: 1240px;
+        /* --- /tokens.css --- */
+
+        /* Kept structural scale: type, spacing, rhythm, elevation shell (unchanged). */
+        --text-xs: 12px;
+        --text-sm: 14px;
+        --text-base: 16px;
+        --text-lg: 18px;
+        --text-xl: 22px;
+        --text-2xl: 32px;
+        --text-3xl: 48px;
+        --text-4xl: 64px;
+        --leading-body: 1.52;
+        --leading-tight: 1.08;
+        --tracking-display: -0.018em;
+        --space-1: 4px;
+        --space-2: 8px;
+        --space-3: 12px;
+        --space-4: 16px;
+        --space-5: 20px;
+        --space-6: 24px;
+        --space-8: 32px;
+        --space-12: 48px;
+        --section-y-desktop: 96px;
+        --section-y-tablet: 68px;
+        --section-y-phone: 48px;
+        --elev-flat: none;
+        --elev-ring: 0 0 0 1px var(--border);
+        --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+        --container-gutter-desktop: 36px;
+        --container-gutter-tablet: 24px;
+        --container-gutter-phone: 16px;
+
+        /* Prototype extensions, re-derived for the dark ground: text tints clear
+           4.5:1 on --bg/--surface; soft tints are solid dark fills so tinted
+           text keeps its contrast on any surface. */
+        --success-text: #7dd85f;
+        --warn-text: #ffcc00;
+        --danger-text: #ff8a93;
+        --accent-soft: #10242e;
+        --danger-soft: #2e1216;
+        --success-soft: #102a1f;
+        --warn-soft: #2e2a1f;
+        --danger-on: #ffffff;
+        --danger-hover: color-mix(in oklab, var(--danger), black 14%);
+        --accent-hover: color-mix(in oklab, var(--accent), black 8%);
+        --accent-active: color-mix(in oklab, var(--accent), black 14%);
+        --border-soft: #2a3540;
+        --chart-grid: #2a3540;
+        --chart-series-2: #a9b4c0;
+        --chart-series-3: #6f7d8c;
+        --scrim: rgba(0, 9, 14, 0.6);
+        --radius-xs: 4px;
+        --shell-sidebar-w: 252px;
+        --shadow-pop: 0 14px 34px rgba(0, 0, 0, 0.55);
+        --elev-raised: 0 18px 42px rgba(0, 0, 0, 0.45);
+        --z-sticky: 20;
+        --z-scrim: 40;
+        --z-overlay: 50;
+        --z-toast: 60;
+      }
+    </style>
+
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/views.css" />
+  </head>
+
+  <body>
+    <a class="skip-link" href="#view">Skip to main content</a>
+
+    <noscript>
+      <p class="noscript-note">
+        This prototype is an interactive single-page app and needs JavaScript enabled to run the
+        ETL pipeline, module registry and dashboards.
+      </p>
+    </noscript>
+
+    <div class="shell">
+      <aside class="sidebar" id="sidebar" aria-label="Workspace navigation">
+        <div class="sidebar-head">
+          <span class="brand-mark" aria-hidden="true">iF</span>
+          <span class="brand-text">
+            <strong class="brand-name">iFixz Workspace</strong>
+            <span class="brand-sub">Central database · sample data</span>
+          </span>
+          <button class="icon-btn sidebar-close" id="sidebarClose" type="button" aria-label="Close navigation">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M5 5l10 10M15 5L5 15" /></svg>
+          </button>
+        </div>
+
+        <nav class="sidebar-nav od-scroll" id="sidebarNav" aria-label="Primary"></nav>
+
+        <div class="sidebar-foot" id="sidebarFoot"></div>
+      </aside>
+
+      <div class="scrim" id="scrim" hidden></div>
+
+      <div class="main">
+        <header class="topbar">
+          <button class="icon-btn nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="sidebar">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 6h14M3 10h14M3 14h14" /></svg>
+            <span class="sr-only">Open navigation</span>
+          </button>
+
+          <div class="topbar-titles">
+            <h1 class="page-title" id="pageTitle">Overview</h1>
+            <p class="page-sub" id="pageSub">Shared metrics across registered modules</p>
+          </div>
+
+          <div class="topbar-actions">
+            <span class="chip" id="dbStatus" title="Central database status"></span>
+            <div class="menu-wrap">
+              <button
+                class="account-btn"
+                id="accountBtn"
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded="false"
+                aria-controls="accountMenu"
+              >
+                <span class="avatar" id="accountAvatar" aria-hidden="true">AM</span>
+                <span class="account-text">
+                  <span class="account-name" id="accountName">Aria Mendoza</span>
+                  <span class="account-role" id="accountRole">Organization admin</span>
+                </span>
+                <svg class="account-caret" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M6 8l4 4 4-4" /></svg>
+              </button>
+              <div class="menu" id="accountMenu" role="menu" aria-labelledby="accountBtn" hidden></div>
+            </div>
+          </div>
+        </header>
+
+        <main class="view od-scroll" id="view" tabindex="-1"></main>
+      </div>
+    </div>
+
+    <div class="toast-region" id="toasts" role="status" aria-live="polite"></div>
+    <div class="overlay-root" id="overlayRoot"></div>
+
+    <script src="js/data.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/views-overview.js"></script>
+    <script src="js/views-pipeline.js"></script>
+    <script src="js/views-registry.js"></script>
+    <script src="js/views-module.js"></script>
+    <script src="js/views-backups.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
