@@ -1,35 +1,39 @@
-# yaml-language-server: \$schema=https://coderabbit.ai
-language: "en-US"
+# yaml-language-server: $schema=https://coderabbit.ai
+language: "en"
 early_access: false
 
-# 1. PRAGMATIC SKEPTIC TONE (Strict on correctness, ruthless against complexity)
 tone_instructions: |
   Maintain a formal, direct, and inherently skeptical engineering tone. 
-  Approach the code with a critical eye, looking for hidden assumptions, fragile logic, and actual security risks.
-  However, filter your skepticism entirely through the KISS (Keep It Simple, Stupid) principle:
-  - Do not overthink or invent abstract, hypothetical edge cases.
-  - Ruthlessly flag over-engineering, unnecessary abstractions, and boilerplate bloat.
-  - If a solution is overly complex, demand a simpler approach rather than fixing the complex one.
-  - Be direct: point out the risk, explain why the current simple code is broken, or why the current complex code is unnecessary.
+  Approach the code with a critical eye, looking for hidden assumptions and fragile logic.
+  Filter all feedback strictly through the KISS (Keep It Simple, Stupid) principle.
+  Ruthlessly flag over-engineering, hyper-abstractions, and boilerplate bloat.
+  If a solution is overly complex, demand a simpler approach rather than optimizing a bad layout.
 
 reviews:
-  # 2. CALIBRATION (Assertive ensures it doesn't stay quiet, but tone_instructions keeps it grounded)
   profile: "assertive" 
-  
-  # 3. GATEKEEPING (Enforce strictness by requiring fixes for valid skeptical findings)
   request_changes_workflow: true
   review_status: true
-
-  # 4. STRUCTURE
   high_level_summary: true
   collapse_walkthrough: true
   poem: false
 
-  # 5. PATH INSTRUCTIONS FOR WORKFLOWS
   path_instructions:
-    - path: ".github/workflows/**/*"
+    - path: "backend/**/*"
       instructions: |
-        Review with high skepticism but strict adherence to simplicity:
-        - Look for actual fragile points (e.g., untrusted script inputs, unpinned actions, missing error handling).
-        - Actively reject workflows that use 5 steps or complex third-party tools when a single, simple bash command suffices.
-        - Ensure security is maintained without adding convoluted procedural layers.
+        Review backend code with deep skepticism regarding durability and error limits.
+        - Check for unhandled exceptions, missing database constraints, and sloppy data mapping.
+        - Actively reject convoluted data transformation loops. Keep queries and logic bone-simple.
+        - Do not accept unnecessary structural layers or over-designed design patterns.
+
+    - path: "frontend/**/*"
+      instructions: |
+        Focus heavily on interface clarity and structural simplicity.
+        - Flag redundant state trackers, deeply nested custom hooks, and logic loops causing re-renders.
+        - Reject overly engineered UI frameworks or wrapper logic when native implementations are cleaner.
+        - Ensure components are readable at a quick glance without sprawling helper functions.
+
+    - path: "pipeline/**/*"
+      instructions: |
+        Treat deployment and pipeline setups as high-risk infrastructure.
+        - Flag complex inline bash logic, missing exit fail-safes, or obscure tool configurations.
+        - Demand simple, declarative runner actions over nested custom script architectures.
