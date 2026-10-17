@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "@tanstack/react-query": "^5.104.3",
-    "@tanstack/react-query-devtools": "^5.104.3",
-    "zustand": "^5.0.15"
-  }
-}
