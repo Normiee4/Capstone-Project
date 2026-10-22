@@ -514,11 +514,12 @@
 
     var actions = '<a class="btn ' + (tab === 'records' ? 'btn-primary' : 'btn-secondary') + ' btn-sm" href="#/module/' + UI.esc(mod.id) + '">Dashboard</a>' +
       '<a class="btn ' + (tab === 'records' ? 'btn-secondary' : 'btn-primary') + ' btn-sm" href="#/module/' + UI.esc(mod.id) + '/records">Records</a>';
-    if (canInput) actions += '<button class="btn btn-secondary btn-sm" type="button" data-act="add-record">' + UI.icon('plus') + 'Add record</button>';
+    var sales = NS.DealViews.isSales(mod);
+    if (canInput) actions += '<button class="btn btn-secondary btn-sm" type="button" data-act="add-record">' + UI.icon('plus') + (sales ? 'New deal' : 'Add record') + '</button>';
     if (canRun && active) {
       actions += mod.kind === 'external'
         ? '<button class="btn btn-secondary btn-sm" type="button" data-act="run-sync"' + (down ? ' disabled title="Source is unreachable"' : '') + '>' + UI.icon('sync') + 'Sync now</button>'
-        : '<button class="btn btn-secondary btn-sm" type="button" data-act="run-bulk">' + UI.icon('play') + 'Import batch</button>';
+        : '<button class="btn btn-secondary btn-sm" type="button" data-act="run-bulk">' + UI.icon('play') + (sales ? 'Import lead batch' : 'Import batch') + '</button>';
     }
 
     return '<section class="module-head"><div class="module-head-main">' +
@@ -585,7 +586,7 @@
       '<span class="chip chip-mono"><span data-filter-count>' + total + ' of ' + total + '</span></span>' +
       '<span class="spacer"></span>' +
       '<button class="btn btn-ghost btn-sm" type="button" data-act="export"' + (total ? '' : ' disabled') + '>' + UI.icon('download') + 'Export CSV</button>' +
-      (canInput ? '<button class="btn btn-primary btn-sm" type="button" data-act="add-record">' + UI.icon('plus') + 'Add record</button>' : '') +
+      (canInput ? '<button class="btn btn-primary btn-sm" type="button" data-act="add-record">' + UI.icon('plus') + (NS.DealViews.isSales(mod) ? 'New deal' : 'Add record') + '</button>' : '') +
       '</div>';
 
     var pagination = total > PAGE_SIZE
@@ -700,10 +701,10 @@
         ? mod.kind === 'native' ? 'Records typed and validated in the workspace' : 'Records mirrored from the source system'
         : 'Module dashboard · ' + (mod.source.state === 'down' ? 'last synced ' + UI.relTime(mod.source.lastSyncedAt) : 'live sample data');
     },
-    render: function (root, params) {
+    render: function (root, params, query) {
       lastRoot = root;
       lastParams = params;
-      lastQuery = null;
+      lastQuery = query || null;
 
       var mod = Store.module(params.id);
       if (!mod) {
@@ -730,15 +731,20 @@
 
       var content;
       var ims = isIms(mod);
+      var deals = NS.DealViews;
+      var sales = deals.isSales(mod);
       if (tab === 'records') {
         content = recordsView(mod);
       } else {
         content = (metrics.length ? '<section class="metric-grid">' + metricHtml + '</section>' : '') +
+          (sales ? deals.salesSections(query) : '') +
+          (ims ? deals.imsCard() : '') +
           movementLedger(mod) +
           panelHtml +
           '<div class="chart-grid-2">' + trendCard(mod) + groupCard(mod) + '</div>' +
-          recentCard(mod) +
-          '<div class="overview-grid">' + integrationCard(mod) + rulesCard(mod) + '</div>';
+          (sales ? '' : recentCard(mod)) +
+          '<div class="overview-grid">' + integrationCard(mod) + rulesCard(mod) + '</div>' +
+          (sales ? deals.glossaryCard() : '');
       }
 
       var wrap = shell(root,
@@ -746,7 +752,11 @@
         content +
         '<p class="text-xs text-muted">Sample data stored in this browser only. Nothing leaves the page and no live source system is contacted.</p>');
 
-      UI.on(wrap, 'click', '[data-act="add-record"]', function () { openRecordDialog(mod); });
+      UI.on(wrap, 'click', '[data-act="add-record"]', function () {
+        if (sales) deals.openCreate();
+        else openRecordDialog(mod);
+      });
+      if (sales || ims) deals.wire(wrap);
 
       UI.on(wrap, 'click', '[data-act="run-sync"]', function (event, button) { runPipeline(mod, 'sync', button); });
       UI.on(wrap, 'click', '[data-act="run-bulk"]', function (event, button) { runPipeline(mod, 'bulk', button); });

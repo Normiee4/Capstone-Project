@@ -107,7 +107,9 @@
 .toolbar-field { display: grid; gap: 6px; min-width: 180px; }
 .toolbar-actions { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; flex-wrap: wrap; }
 
-.chip-rail { display: flex; gap: var(--space-2); overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+/* Wraps rather than scrolling: the rail hides its scrollbar, so on a phone
+   the last filters were cut off with no hint they existed. */
+.chip-rail { display: flex; flex-wrap: wrap; gap: var(--space-2); padding-bottom: 2px; }
 .chip-rail::-webkit-scrollbar { display: none; }
 .chip-btn {
   display: inline-flex;
@@ -144,6 +146,17 @@
 .rule-meta { color: var(--muted); font-family: var(--font-mono); font-size: var(--text-xs); }
 .rule-actions { display: flex; align-items: center; gap: var(--space-2); }
 .rule-row.is-off .rule-text { color: var(--muted); font-weight: 400; }
+/* Phones: tag and controls share the top line, the rule text gets the full
+   width below instead of wrapping word by word in a narrow middle column. */
+@media (max-width: 639px) {
+  .rule-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "type actions" "body body"; row-gap: var(--space-2); }
+  .rule-row .rule-type { grid-area: type; justify-self: start; }
+  .rule-row .rule-body { grid-area: body; }
+  .rule-row .rule-actions { grid-area: actions; }
+  /* five columns cannot share a phone width — scroll inside the wrapper */
+  #rejected-table { min-width: 640px; }
+}
+.rejected-id { white-space: nowrap; }
 .rule-row.is-off .rule-type { opacity: 0.6; }
 
 .rule-type {
@@ -162,9 +175,10 @@
 }
 
 .run-result { display: grid; gap: var(--space-4); }
-.run-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
-@media (max-width: 639px) { .run-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.run-stat { display: grid; gap: 2px; padding: var(--space-3); border: 1px solid var(--border-soft); border-radius: var(--radius-md); background: var(--surface); }
+/* auto-fit: four across in a wide card, fewer as the card narrows (the
+   health card sits in a third-width column on desktop). */
+.run-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 108px), 1fr)); gap: var(--space-3); }
+.run-stat { display: grid; gap: 2px; min-width: 0; padding: var(--space-3); border: 1px solid var(--border-soft); border-radius: var(--radius-md); background: var(--surface); }
 .run-stat span { color: var(--muted); font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
 .run-stat strong { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
 
@@ -259,6 +273,106 @@
 .stack-tight { display: grid; gap: var(--space-1); }
 .stack-tight span { display: block; }
 
+/* -------------------------------------------------------- deal lifecycle -- */
+
+.deal-lanes { display: grid; gap: var(--space-4); }
+.deal-lane { display: grid; gap: var(--space-2); }
+.deal-lane-head { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-sm); }
+.deal-lane-head span { color: var(--muted); font-size: var(--text-xs); }
+.stage-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: var(--space-2); }
+
+.stage-tile {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: inherit;
+  transition: border-color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard);
+}
+.stage-tile:hover { border-color: var(--accent); text-decoration: none; }
+.stage-tile:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.stage-tile.is-warn { border-left-color: var(--warn); }
+.stage-tile.is-ok { border-left-color: var(--success); }
+.stage-tile.is-danger { border-left-color: var(--danger); }
+.stage-tile.is-active { border-color: var(--accent); background: var(--accent-soft); }
+.stage-tile-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.stage-tile-name { font-size: var(--text-xs); font-weight: 700; color: var(--fg-2); min-width: 0; }
+.stage-tile-owner {
+  margin-left: auto;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--meta);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+.stage-tile-count { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+.stage-tile-value { color: var(--muted); font-family: var(--font-mono); font-size: var(--text-xs); }
+
+.deal-steps { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-1); padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface); list-style: none; }
+.deal-step { display: flex; align-items: center; gap: 6px; padding-right: var(--space-2); font-size: var(--text-xs); font-weight: 700; color: var(--muted); }
+.deal-step + .deal-step::before { content: ""; width: 12px; height: 1px; background: var(--border); margin-right: var(--space-1); }
+.deal-step-dot {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.deal-step-dot svg { width: 12px; height: 12px; }
+.deal-step-owner { color: var(--meta); font-family: var(--font-mono); font-size: 10px; }
+.deal-step.is-done { color: var(--success-text); }
+.deal-step.is-done .deal-step-dot { border-color: var(--success); background: var(--success-soft); }
+.deal-step.is-current { color: var(--accent); }
+.deal-step.is-current .deal-step-dot { border-color: var(--accent); background: var(--accent); color: var(--accent-on); }
+.deal-step.is-lost.is-current { color: var(--danger-text); }
+.deal-step.is-lost.is-current .deal-step-dot { border-color: var(--danger); background: var(--danger-soft); color: var(--danger-text); }
+
+.deal-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--space-5); align-items: start; }
+.deal-grid > * { min-width: 0; }
+@media (max-width: 767px) { .deal-grid { grid-template-columns: minmax(0, 1fr); } }
+.deal-next { display: grid; gap: var(--space-3); }
+.deal-reasons { display: grid; gap: var(--space-1); list-style: none; }
+.deal-reasons li { display: flex; gap: 6px; align-items: flex-start; color: var(--muted); font-size: var(--text-xs); }
+.deal-reasons svg { width: 12px; height: 12px; flex: none; margin-top: 2px; }
+.deal-form { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--accent); border-radius: var(--radius-md); background: var(--accent-soft); }
+.deal-form-title { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-sm); }
+.deal-form-title svg { width: 16px; height: 16px; color: var(--accent); }
+.deal-form-title .text-muted { font-size: var(--text-xs); }
+
+.deal-history { display: grid; list-style: none; }
+.deal-history li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: var(--text-sm);
+}
+.deal-history li:last-child { border-bottom: 0; }
+.deal-history-time { color: var(--muted); font-family: var(--font-mono); font-size: var(--text-xs); padding-top: 2px; }
+
+.glossary .kv-row dd { font-weight: 400; color: var(--fg-2); }
+
+/* Phones and tablets: drop secondary columns so the deal tables fit without
+   sideways scrolling; the deal number itself opens the deal. */
+@media (max-width: 900px) {
+  table.data .col-optional { display: none; }
+}
+@media (max-width: 639px) {
+  .deal-history li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .deal-steps { padding: var(--space-2); }
+}
+
 /* --------------------------------------------------------------- backups -- */
 
 .backup-layout { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: var(--space-4); align-items: start; }
@@ -280,6 +394,10 @@
 .stack-5 { display: grid; gap: var(--space-5); }
 .stack-6 { display: grid; gap: var(--space-6); }
 .row-wrap { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+/* Grid and flex children default to min-width:auto, so one long nowrap label
+   (a truncated rule name) widens the whole card. Let them shrink instead. */
+:where(.stack-tight, .stack-2, .stack-3, .stack-4, .stack-5, .stack-6) > * { min-width: 0; }
+.row-wrap > .od-truncate { flex: 1 1 0; min-width: 0; }
 .push-right { margin-left: auto; }
 .text-muted { color: var(--muted); }
 .text-xs { font-size: var(--text-xs); }

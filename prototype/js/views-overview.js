@@ -14,7 +14,8 @@
     module: 'registry',
     rule: 'rule',
     backup: 'backup',
-    user: 'user'
+    user: 'user',
+    deal: 'arrowRight'
   };
 
   function display(value) {
@@ -150,7 +151,7 @@
       for (i = 0; i < active.length; i++) mini += moduleMini(active[i]);
 
       root.innerHTML = head +
-        '<section class="metric-grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">' + cards + '</section>' +
+        '<section class="metric-grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))">' + cards + '</section>' +
         '<div class="overview-grid"><section class="card"><div class="card-head"><div class="card-head-text">' +
         '<h2 class="card-title">Central database volume</h2>' +
         '<p class="card-sub">' + UI.fmt.int(Store.recordCount()) + ' records across ' + active.length + ' active modules</p></div>' +

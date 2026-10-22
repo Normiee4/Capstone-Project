@@ -49,21 +49,30 @@ window.IFIXZ = window.IFIXZ || {};
       label: 'Organization admin',
       blurb: 'Registers modules, edits pipeline rules, configures backups',
       person: { name: 'Aria Mendoza', initials: 'AM' },
-      perms: { manageModules: true, editRules: true, manageBackups: true, inputRecords: true, viewAll: true }
+      perms: { manageModules: true, editRules: true, manageBackups: true, inputRecords: true, approveDeals: false, viewAll: true }
     },
     user: {
       id: 'user',
       label: 'Department employee',
       blurb: 'Reads dashboards and enters records in native modules',
       person: { name: 'Rafael Dela Cruz', initials: 'RD' },
-      perms: { manageModules: false, editRules: false, manageBackups: false, inputRecords: true, viewAll: true }
+      perms: { manageModules: false, editRules: false, manageBackups: false, inputRecords: true, approveDeals: false, viewAll: true }
+    },
+    /* Approver role from the TO-BE board: deals are approved in the workspace
+       by the General Manager. Named by position, not by person. */
+    approver: {
+      id: 'approver',
+      label: 'General manager',
+      blurb: 'Approves or rejects deals before they are won',
+      person: { name: 'General Manager', initials: 'GM' },
+      perms: { manageModules: false, editRules: false, manageBackups: false, inputRecords: true, approveDeals: true, viewAll: true }
     },
     super_admin: {
       id: 'super_admin',
       label: 'Client super admin',
       blurb: 'Read-only oversight across every registered module',
       person: { name: 'Bea Alonzo', initials: 'BA' },
-      perms: { manageModules: false, editRules: false, manageBackups: false, inputRecords: false, viewAll: true }
+      perms: { manageModules: false, editRules: false, manageBackups: false, inputRecords: false, approveDeals: false, viewAll: true }
     }
   };
 
@@ -191,6 +200,303 @@ window.IFIXZ = window.IFIXZ || {};
     ['SKU-1039', 'Tablet 10-inch', 17800], ['SKU-1040', 'Headset with microphone', 2350]
   ];
 
+  /* ------------------------------------------------ deal lifecycle (TO-BE) --
+     One Deal record carries a sale from New Deal to Done, as on the FigJam
+     TO-BE overlay. Sales Operation owns the sales pipeline, Accounting,
+     Invoicing and Delivery; IMS owns Purchasing, Order Basis and Inventory.
+     Approval is the General Manager's step. */
+
+  var DEAL_STAGES = [
+    { key: 'new', label: 'New Deal', lane: 'sales', owner: 'sales-operation', hint: 'From the Bitrix24 lead sync or entered directly' },
+    { key: 'gov', label: 'Government', lane: 'sales', owner: 'sales-operation', hint: 'Standalone bidding track for government clients' },
+    { key: 'followup', label: 'Follow-up', lane: 'sales', owner: 'sales-operation', hint: '1st to 3rd call or email to confirm the client' },
+    { key: 'pending', label: 'Pending', lane: 'sales', owner: 'sales-operation', hint: 'No answer after the 3rd follow-up' },
+    { key: 'approval', label: 'Approval', lane: 'sales', owner: 'sales-operation', hint: 'Waiting for the General Manager' },
+    { key: 'won', label: 'Deal Won', lane: 'sales', owner: 'sales-operation', hint: 'Client confirmed — hand off to Operations' },
+    { key: 'accounting', label: 'Accounting', lane: 'ops', owner: 'sales-operation', hint: 'Credit check against unpaid balances' },
+    { key: 'purchasing', label: 'Purchasing', lane: 'ops', owner: 'ims', hint: 'Buy the items and record the PO' },
+    { key: 'orderbasis', label: 'Order Basis', lane: 'ops', owner: 'ims', hint: 'Hard-to-source items on long lead times' },
+    { key: 'inventory', label: 'Inventory', lane: 'ops', owner: 'ims', hint: 'Check stock against the order and post the RR' },
+    { key: 'invoicing', label: 'Invoicing', lane: 'ops', owner: 'sales-operation', hint: 'Issue the SI / WR' },
+    { key: 'delivery', label: 'Delivery', lane: 'ops', owner: 'sales-operation', hint: 'Deliver; exits as Done or Unpaid / Terms' },
+    { key: 'terms', label: 'Unpaid / Terms', lane: 'ops', owner: 'sales-operation', hint: 'Delivered, balance still open — visible to Accounting' },
+    { key: 'done', label: 'Done', lane: 'closed', owner: 'sales-operation', hint: 'Delivered and fully paid' },
+    { key: 'lost', label: 'Deal Lost', lane: 'closed', owner: 'sales-operation', hint: 'Lost the bid, rejected, or the client left' }
+  ];
+  var STAGE_BY_KEY = {};
+  var STAGE_BY_LABEL = {};
+  var STAGE_LABELS = [];
+  (function () {
+    for (var s = 0; s < DEAL_STAGES.length; s++) {
+      STAGE_BY_KEY[DEAL_STAGES[s].key] = DEAL_STAGES[s];
+      STAGE_BY_LABEL[DEAL_STAGES[s].label] = DEAL_STAGES[s];
+      STAGE_LABELS.push(DEAL_STAGES[s].label);
+    }
+  })();
+  var CLOSED_STAGES = ['Done', 'Deal Lost'];
+  var WON_STAGES = ['Deal Won', 'Accounting', 'Purchasing', 'Order Basis', 'Inventory', 'Invoicing', 'Delivery', 'Unpaid / Terms', 'Done'];
+  var OPS_STAGES = ['Accounting', 'Purchasing', 'Order Basis', 'Inventory', 'Invoicing', 'Delivery'];
+  var DEAL_TRACKS = ['Private', 'Government'];
+  var LOST_REASONS = ['Lost the bid', 'Client chose a cheaper supplier', 'Rejected at approval', 'No reply after follow-ups', 'Other'];
+  var DOC_TYPES = ['Sales Invoice (SI)', 'Written Report (WR)'];
+  var PAY_TERMS = ['Unpaid — collect after delivery', '15 days', '30 days', '60 days'];
+  var GOV_CLIENTS = ['Provincial Engineering Office', 'Municipal Health Office', 'State University Supply Office', 'City Disaster Risk Office'];
+
+  /* Each action is one arrow on the board. `to` is the target stage key;
+     fields are stored on the deal; perm gates the General Manager's step. */
+  var DEAL_ACTIONS = {
+    followup: {
+      label: 'Log follow-up', to: 'followup', icon: 'edit',
+      help: 'Logs one call or email attempt on the deal. Up to three attempts.',
+      fields: [{ name: 'channel', label: 'Channel', type: 'select', options: ['Call', 'Email', 'Call and email'], required: true }]
+    },
+    startBid: {
+      label: 'Start bidding', to: 'gov', icon: 'arrowRight', primary: true,
+      help: 'Government clients go through the standalone bidding track instead of follow-ups.',
+      fields: [{ name: 'bidRef', label: 'Bid reference', placeholder: 'Optional' }]
+    },
+    awarded: { label: 'Bid awarded', to: 'approval', icon: 'check', primary: true, help: 'The bid was awarded — the deal goes to the General Manager for approval.' },
+    confirmed: { label: 'Client confirmed', to: 'approval', icon: 'check', primary: true, help: 'The client confirmed — the deal goes to the General Manager for approval.' },
+    noAnswer: { label: 'No answer — move to Pending', to: 'pending', icon: 'alert', help: 'The client did not answer any of the three follow-ups.' },
+    replied: {
+      label: 'Client replied', to: 'approval', icon: 'check',
+      help: 'Assumption to confirm with iFixz: the board only shows Pending ending in Deal Lost.'
+    },
+    approve: { label: 'Approve deal', to: 'won', icon: 'check', primary: true, perm: 'approveDeals', help: 'General Manager approval — the client is confirmed and the deal is won.' },
+    reject: {
+      label: 'Reject deal', to: 'lost', icon: 'ban', tone: 'danger', perm: 'approveDeals', noteRequired: true, lostReason: 'Rejected at approval',
+      help: 'Closes the deal as lost. The note tells Sales why.'
+    },
+    handoff: { label: 'Hand off to Operations', to: 'accounting', icon: 'arrowRight', primary: true, help: 'Every won deal starts Operations at Accounting.' },
+    credit: {
+      label: 'Credit check cleared', to: 'purchasing', icon: 'check', primary: true,
+      help: 'Accounting read the client’s unpaid balances from the central database. The deal moves to Purchasing in IMS.'
+    },
+    po: {
+      label: 'Record PO', to: 'inventory', icon: 'file', primary: true,
+      help: 'Purchasing ordered the items. The PO number is stored on the deal.',
+      fields: [{ name: 'poNo', label: 'PO number', placeholder: 'PO-2026-0412', required: true }]
+    },
+    hardSource: {
+      label: 'Hard to source — Order Basis', to: 'orderbasis', icon: 'alert',
+      help: 'The items have a long lead time. The deal waits in Order Basis until they arrive.',
+      fields: [{ name: 'poNo', label: 'PO number', placeholder: 'PO-2026-0412', required: true }]
+    },
+    arrived: { label: 'Item arrived', to: 'inventory', icon: 'download', primary: true, help: 'The long-lead items arrived. Inventory checks them and posts the RR.' },
+    rr: {
+      label: 'Post RR', to: 'invoicing', icon: 'download', primary: true,
+      help: 'Posting the RR receives the units into IMS stock and sends the deal to Invoicing.',
+      fields: [
+        { name: 'rrNo', label: 'RR number', placeholder: 'RR-2026-0231', required: true },
+        { name: 'warehouse', label: 'Receiving warehouse', type: 'select', options: WAREHOUSES, required: true }
+      ]
+    },
+    si: {
+      label: 'Issue SI / WR', to: 'delivery', icon: 'file', primary: true,
+      help: 'The SI / WR number is stored on the deal as another unique identifier.',
+      fields: [
+        { name: 'docType', label: 'Document', type: 'select', options: DOC_TYPES, required: true },
+        { name: 'siNo', label: 'SI / WR number', placeholder: 'SI-2026-0388', required: true }
+      ]
+    },
+    paid: { label: 'Delivered — fully paid', to: 'done', icon: 'check', primary: true, help: 'Delivery issues the units from IMS stock and closes the deal.' },
+    terms: {
+      label: 'Delivered — unpaid / on terms', to: 'terms', icon: 'upload',
+      help: 'Delivery issues the units from IMS stock. The balance stays visible to Accounting until it is paid.',
+      fields: [{ name: 'terms', label: 'Payment terms', type: 'select', options: PAY_TERMS, required: true }]
+    },
+    payment: {
+      label: 'Record full payment', to: 'done', icon: 'check', primary: true,
+      help: 'The client paid the balance — the deal is done.',
+      fields: [{ name: 'orNo', label: 'OR number', placeholder: 'Optional' }]
+    },
+    lost: {
+      label: 'Mark deal lost', to: 'lost', icon: 'ban', tone: 'danger',
+      help: 'A deal can be lost at any stage of the sales pipeline.',
+      fields: [{ name: 'reason', label: 'Reason', type: 'select', options: LOST_REASONS, required: true }]
+    }
+  };
+
+  var DEAL_FLOW = {
+    'new': function (deal) { return deal.track === 'Government' ? ['startBid', 'lost'] : ['followup', 'lost']; },
+    gov: ['awarded', 'lost'],
+    followup: ['followup', 'confirmed', 'noAnswer', 'lost'],
+    pending: ['replied', 'lost'],
+    approval: ['approve', 'reject'],
+    won: ['handoff', 'lost'],
+    accounting: ['credit'],
+    purchasing: ['po', 'hardSource'],
+    orderbasis: ['arrived'],
+    inventory: ['rr'],
+    invoicing: ['si'],
+    delivery: ['paid', 'terms'],
+    terms: ['payment'],
+    done: [],
+    lost: []
+  };
+
+  /* Plain-language terms, as the board asks ("define unfamiliar words"). */
+  var DEAL_GLOSSARY = [
+    { term: 'PO — Purchase Order', text: 'The order Purchasing places with a supplier for the items a deal needs.' },
+    { term: 'RR — Receiving Report', text: 'Inventory’s record that the ordered items arrived. Posting it adds the units to IMS stock.' },
+    { term: 'SI / WR — Sales Invoice / Written Report', text: 'The billing document for the deal; its number is another unique identifier on the deal.' },
+    { term: 'OR — Official Receipt', text: 'Proof of the client’s payment, recorded when an unpaid or terms deal is settled.' },
+    { term: 'Order Basis', text: 'Items that are hard to source and take a long time to arrive. The deal waits here until they do.' },
+    { term: 'Terms', text: 'The client pays within an agreed period after delivery (for example 30 days) instead of upfront.' },
+    { term: 'Credit check', text: 'Accounting looks up whether the client still has unpaid balances from earlier deals.' },
+    { term: 'Government track', text: 'Government clients go through bidding. An awarded bid goes to the General Manager for approval.' }
+  ];
+
+  function itemOf(sku) {
+    for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i][0] === sku) return ITEMS[i];
+    return null;
+  }
+
+  /* Seeded deals past RR posting but not yet delivered hold their units in
+     IMS, so the demo can deliver them without a stock shortfall. */
+  function stockReceivedDeals(ims, deals) {
+    for (var i = 0; i < deals.length; i++) {
+      if (deals[i].stage !== 'Invoicing' && deals[i].stage !== 'Delivery') continue;
+      var line = ensureStockLine(ims, deals[i].sku, deals[i].warehouse);
+      line.qty = (Number(line.qty) || 0) + Number(deals[i].qty);
+    }
+  }
+
+  function dealSummary(actionId, deal, values) {
+    switch (actionId) {
+      case 'followup': return 'Follow-up ' + deal.followUps + ' logged (' + values.channel + ')';
+      case 'startBid': return 'Bidding started' + (values.bidRef ? ' · ' + values.bidRef : '');
+      case 'awarded': return 'Bid awarded — sent to approval';
+      case 'confirmed': return 'Client confirmed — sent to approval';
+      case 'noAnswer': return 'No answer after 3 follow-ups — moved to Pending';
+      case 'replied': return 'Client replied — sent to approval';
+      case 'approve': return 'Approved by the General Manager — deal won';
+      case 'reject': return 'Rejected by the General Manager';
+      case 'handoff': return 'Handed off to Operations';
+      case 'credit': return 'Credit check cleared — sent to Purchasing';
+      case 'po': return 'PO ' + deal.poNo + ' recorded';
+      case 'hardSource': return 'Hard to source — PO ' + deal.poNo + ' on order basis';
+      case 'arrived': return 'Long-lead items arrived';
+      case 'rr': return 'RR ' + deal.rrNo + ' posted · ' + deal.qty + ' units received in ' + deal.warehouse;
+      case 'si': return deal.docType + ' ' + deal.siNo + ' issued';
+      case 'paid': return 'Delivered and fully paid';
+      case 'terms': return 'Delivered on terms (' + deal.terms + ')';
+      case 'payment': return 'Full payment recorded' + (values.orNo ? ' · ' + values.orNo : '');
+      case 'lost': return 'Deal lost — ' + deal.lostReason;
+      default: return DEAL_ACTIONS[actionId] ? DEAL_ACTIONS[actionId].label : 'Deal updated';
+    }
+  }
+
+  /* Seed deals walk the real path to their stage so every document number,
+     follow-up count and history entry is consistent with where they sit. */
+  function seedDeals() {
+    var plan = [
+      ['new', 8], ['gov', 4], ['followup', 12], ['pending', 5], ['approval', 7], ['won', 4],
+      ['accounting', 5], ['purchasing', 6], ['orderbasis', 4], ['inventory', 5], ['invoicing', 5],
+      ['delivery', 5], ['terms', 8], ['done', 14], ['lost', 8]
+    ];
+    var reps = ['R. Dela Cruz', 'J. Uy', 'C. Ramos', 'P. Lim'];
+    var deals = [];
+    var seq = 0;
+    for (var p = 0; p < plan.length; p++) {
+      for (var n = 0; n < plan[p][1]; n++) {
+        seq++;
+        var target = plan[p][0];
+        var gov = target === 'gov' || (target !== 'followup' && target !== 'pending' && maybe(0.16));
+        var item = pick(ITEMS);
+        var qty = item[2] > 20000 ? intBetween(1, 4) : item[2] < 500 ? intBetween(60, 400) : intBetween(2, 24);
+        var deal = {
+          id: 'DL-2026-' + ('0000' + seq).slice(-4),
+          dealNo: 'DL-2026-' + ('0000' + seq).slice(-4),
+          customer: gov ? pick(GOV_CLIENTS) : pick(COMPANIES),
+          track: gov ? 'Government' : 'Private',
+          region: pick(REGIONS),
+          sku: item[0],
+          qty: qty,
+          amount: Math.max(100, Math.round((qty * item[2] * (1.15 + rnd() * 0.2)) / 100) * 100),
+          stage: 'New Deal',
+          followUps: 0,
+          history: [],
+          _source: maybe(0.6) ? 'sync' : 'native'
+        };
+
+        var steps = ['new'];
+        if (gov) steps.push('gov');
+        else {
+          var tries = target === 'pending' ? 3 : intBetween(1, 3);
+          for (var t = 0; t < tries; t++) steps.push('followup');
+        }
+        if (target === 'pending') steps.push('pending');
+        else {
+          var path = ['approval', 'won', 'accounting', 'purchasing'];
+          if (target === 'orderbasis' || (target !== 'purchasing' && maybe(0.2))) path.push('orderbasis');
+          path = path.concat(['inventory', 'invoicing', 'delivery']);
+          if (target === 'terms' || (target === 'done' && maybe(0.4))) path.push('terms');
+          path.push('done');
+          for (var s = 0; s < path.length; s++) steps.push(path[s]);
+        }
+
+        var stop;
+        if (target === 'lost') {
+          var salesSteps = 0;
+          for (stop = 0; stop < steps.length; stop++) if (STAGE_BY_KEY[steps[stop]].lane === 'sales') salesSteps = stop;
+          steps = steps.slice(0, intBetween(1, salesSteps + 1));
+          steps.push('lost');
+        } else {
+          stop = steps.lastIndexOf(target);
+          steps = steps.slice(0, stop + 1);
+        }
+
+        var span = Math.min(58, steps.length * intBetween(2, 4));
+        var idle = intBetween(0, 9); /* days since the deal last moved */
+        var rep = pick(reps);
+        for (var k = 0; k < steps.length; k++) {
+          var key = steps[k];
+          var at = daysAgoIso(idle + Math.max(0, Math.round(span - (k * span) / Math.max(1, steps.length - 1))), intBetween(8, 18));
+          var from = deal.stage;
+          var actionId = '';
+          var actor = rep;
+          if (k === 0) {
+            deal.createdAt = at;
+            deal.history.push({ at: at, from: '', to: 'New Deal', action: deal._source === 'sync' ? 'Deal created from the Bitrix24 lead sync' : 'Deal entered in the workspace', actor: rep, note: '' });
+            continue;
+          }
+          if (key === 'followup') { deal.followUps++; actionId = 'followup'; }
+          else if (key === 'gov') actionId = 'startBid';
+          else if (key === 'pending') actionId = 'noAnswer';
+          else if (key === 'approval') actionId = gov ? 'awarded' : 'confirmed';
+          else if (key === 'won') { actionId = 'approve'; actor = 'General Manager'; }
+          else if (key === 'accounting') actionId = 'handoff';
+          else if (key === 'purchasing') { actionId = 'credit'; actor = 'Accounting'; }
+          else if (key === 'orderbasis') { deal.poNo = 'PO-2026-' + (3000 + seq); actionId = 'hardSource'; actor = 'Purchasing'; }
+          else if (key === 'inventory') {
+            if (from === 'Order Basis') { actionId = 'arrived'; actor = 'Inventory'; }
+            else { deal.poNo = 'PO-2026-' + (3000 + seq); actionId = 'po'; actor = 'Purchasing'; }
+          } else if (key === 'invoicing') { deal.rrNo = 'RR-2026-' + (5000 + seq); deal.warehouse = pick(WAREHOUSES); actionId = 'rr'; actor = 'Inventory'; }
+          else if (key === 'delivery') { deal.docType = pick(DOC_TYPES); deal.siNo = (deal.docType.indexOf('WR') !== -1 ? 'WR-2026-' : 'SI-2026-') + (7000 + seq); actionId = 'si'; actor = 'Accounting'; }
+          else if (key === 'terms') { deal.terms = pick(PAY_TERMS); actionId = 'terms'; actor = 'Delivery'; }
+          else if (key === 'done') { actionId = from === 'Unpaid / Terms' ? 'payment' : 'paid'; deal.paidAt = at; actor = from === 'Unpaid / Terms' ? 'Accounting' : 'Delivery'; }
+          else if (key === 'lost' && from === 'Approval') { deal.lostReason = 'Rejected at approval'; actionId = 'reject'; actor = 'General Manager'; }
+          else if (key === 'lost') {
+            deal.lostReason = from === 'Government' ? 'Lost the bid' : from === 'Pending' ? 'No reply after follow-ups' : pick(['Client chose a cheaper supplier', 'Client chose a cheaper supplier', 'Other']);
+            actionId = 'lost';
+          }
+          deal.stage = STAGE_BY_KEY[key].label;
+          deal.history.push({
+            at: at, from: from, to: deal.stage,
+            action: dealSummary(actionId, deal, { channel: pick(['Call', 'Email', 'Call and email']) }),
+            actor: actor, note: ''
+          });
+        }
+        var last = deal.history[deal.history.length - 1];
+        deal.updatedAt = last.at;
+        deal._ingestedAt = deal.createdAt;
+        deals.push(deal);
+      }
+    }
+    return deals;
+  }
+
   function seededModules() {
     var now = new Date();
     var i, r;
@@ -215,20 +521,8 @@ window.IFIXZ = window.IFIXZ || {};
       }
     }
 
-    var salesRecords = [];
-    for (i = 0; i < 260; i++) {
-      salesRecords.push({
-        id: 'SO-' + (20260 + i),
-        orderRef: 'SO-' + (90210 + i),
-        customer: pick(COMPANIES),
-        region: pick(REGIONS),
-        amount: intBetween(18, 640) * 100,
-        status: pick(['Open', 'Invoiced', 'Invoiced', 'Closed', 'Closed', 'Cancelled']),
-        placedAt: daysAgoIso(intBetween(0, 29), intBetween(8, 20)),
-        _source: 'native',
-        _ingestedAt: daysAgoIso(intBetween(0, 29), 21)
-      });
-    }
+    var salesRecords = seedDeals();
+    stockReceivedDeals({ records: imsRecords }, salesRecords);
 
     var billingRecords = [];
     for (i = 0; i < 170; i++) {
@@ -338,7 +632,7 @@ window.IFIXZ = window.IFIXZ || {};
             { key: 'skus', label: 'Active SKUs', type: 'distinct', field: 'sku' },
             { key: 'depleted', label: 'Out-of-stock lines', type: 'countWhere', field: 'qty', params: { values: ['0'] } }
           ],
-          trend: { field: 'qty', label: 'Units received per day', type: 'sum', bucket: 'day', days: 14 },
+          trend: { field: 'qty', dateField: 'updatedAt', label: 'Units on lines updated per day', type: 'sum', bucket: 'day', days: 14 },
           group: { field: 'warehouse', label: 'Units by warehouse', type: 'sum', valueField: 'qty' },
           panels: [
             {
@@ -367,55 +661,48 @@ window.IFIXZ = window.IFIXZ || {};
         key: 'sales-operation',
         kind: 'native',
         owner: 'Commercial',
-        version: '1.9.2',
-        description: 'Order intake and pipeline for the commercial team. Feeds invoicing through the shared metrics layer.',
+        version: '2.0.0',
+        description: 'Deal lifecycle from New Deal to Done — sales pipeline, approval, Accounting, Invoicing and Delivery. Purchasing, Order Basis and Inventory run in IMS on the same deal record.',
         status: 'active',
         createdAt: daysAgoIso(198, 10),
         adapter: { type: 'native', syncMode: 'realtime', interval: 'On save', connection: {}, mapping: {} },
         schema: [
-          { key: 'orderRef', label: 'Order ref', type: 'text', required: true },
+          { key: 'dealNo', label: 'Deal no.', type: 'text', required: true },
           { key: 'customer', label: 'Customer', type: 'text', required: true },
+          { key: 'track', label: 'Track', type: 'enum', required: true, options: DEAL_TRACKS },
           { key: 'region', label: 'Region', type: 'enum', required: true, options: REGIONS },
-          { key: 'amount', label: 'Amount', type: 'number', required: true },
-          { key: 'status', label: 'Status', type: 'enum', required: true, options: ['Open', 'Invoiced', 'Closed', 'Cancelled'] },
-          { key: 'placedAt', label: 'Placed at', type: 'date', required: true }
+          { key: 'sku', label: 'Item SKU', type: 'text', required: true },
+          { key: 'qty', label: 'Qty', type: 'number', required: true },
+          { key: 'amount', label: 'Deal value', type: 'number', required: true },
+          { key: 'stage', label: 'Stage', type: 'enum', required: true, options: STAGE_LABELS },
+          { key: 'createdAt', label: 'Created', type: 'date', required: true }
         ],
         rules: [
-          { id: 'so-r1', field: 'orderRef', type: 'required', label: 'Order ref is required', enabled: true },
-          { id: 'so-r2', field: 'orderRef', type: 'duplicate', label: 'Order ref must be unique', enabled: true },
-          { id: 'so-r3', field: 'amount', type: 'numeric', label: 'Amount must be at least 1', enabled: true, params: { min: 1 } },
+          { id: 'so-r1', field: 'dealNo', type: 'required', label: 'Deal no. is required', enabled: true },
+          { id: 'so-r2', field: 'dealNo', type: 'duplicate', label: 'Deal no. must be unique', enabled: true },
+          { id: 'so-r3', field: 'amount', type: 'numeric', label: 'Deal value must be at least 1', enabled: true, params: { min: 1 } },
           { id: 'so-r4', field: 'region', type: 'allowed', label: 'Region must be one of NCR, Luzon, Visayas, Mindanao', enabled: true, params: { values: REGIONS } },
-          { id: 'so-r5', field: 'status', type: 'allowed', label: 'Status must be Open, Invoiced, Closed or Cancelled', enabled: true, params: { values: ['Open', 'Invoiced', 'Closed', 'Cancelled'] } },
-          { id: 'so-r6', field: 'customer', type: 'required', label: 'Customer is required', enabled: true }
+          { id: 'so-r5', field: 'stage', type: 'allowed', label: 'Stage must be a known deal stage', enabled: true, params: { values: STAGE_LABELS } },
+          { id: 'so-r6', field: 'customer', type: 'required', label: 'Customer is required', enabled: true },
+          { id: 'so-r7', field: 'sku', type: 'reference', label: 'Item SKU must exist in IMS', enabled: true, params: { module: 'ims', field: 'sku' } },
+          { id: 'so-r8', field: 'qty', type: 'numeric', label: 'Qty must be a number of at least 1', enabled: true, params: { min: 1 } },
+          { id: 'so-r9', field: 'track', type: 'allowed', label: 'Track must be Private or Government', enabled: true, params: { values: DEAL_TRACKS } }
         ],
         dashboard: {
           metrics: [
-            { key: 'revenue', label: 'Order value (30d)', type: 'sum', field: 'amount', params: { notStatus: 'Cancelled' } },
-            { key: 'orders', label: 'Orders (30d)', type: 'count' },
-            { key: 'aov', label: 'Average order', type: 'avg', field: 'amount', params: { notStatus: 'Cancelled' } },
-            { key: 'open', label: 'Open orders', type: 'countWhere', field: 'status', params: { values: ['Open'] } }
+            { key: 'pipeline', label: 'Open deal value', type: 'sumWhereNot', field: 'amount', params: { by: 'stage', values: CLOSED_STAGES } },
+            { key: 'approval', label: 'Awaiting approval', type: 'countWhere', field: 'stage', params: { values: ['Approval'] } },
+            { key: 'ops', label: 'Deals in operations', type: 'countWhere', field: 'stage', params: { values: OPS_STAGES } },
+            { key: 'receivables', label: 'Receivables (unpaid / terms)', type: 'sumWhereIn', field: 'amount', params: { by: 'stage', values: ['Unpaid / Terms'] } }
           ],
-          trend: { field: 'amount', label: 'Order value per day', type: 'sum', bucket: 'day', days: 14 },
-          group: { field: 'region', label: 'Orders by region', type: 'count' },
-          panels: [
-            {
-              id: 'open-orders',
-              title: 'Open orders',
-              sub: 'Awaiting invoicing or close · largest value first',
-              tag: 'Status · Open',
-              columns: ['orderRef', 'customer', 'region', 'amount', 'placedAt'],
-              filters: [{ field: 'status', values: ['Open'] }],
-              sort: { field: 'amount', dir: 'desc' },
-              limit: 8,
-              emptyTitle: 'No open orders',
-              emptyText: 'Every order is invoiced, closed or cancelled.'
-            }
-          ]
+          trend: { field: 'amount', dateField: 'createdAt', label: 'New deal value per day', type: 'sum', bucket: 'day', days: 14 },
+          group: { field: 'stage', label: 'Deals by stage', type: 'count' },
+          panels: []
         },
-        sharedMetrics: ['records', 'revenue', 'openWork'],
-        permissions: { user: ['view', 'input'], admin: ['*'] },
+        sharedMetrics: ['records', 'revenue', 'openWork', 'receivables'],
+        permissions: { user: ['view', 'input'], approver: ['view', 'input', 'approve'], admin: ['*'] },
         routes: { dashboard: '#/module/sales-operation', records: '#/module/sales-operation/records' },
-        events: ['record.rejected', 'module.sync'],
+        events: ['record.rejected', 'module.sync', 'deal.stage_changed'],
         source: { state: 'up', lastSyncedAt: minutesAgoIso(6) },
         records: salesRecords
       },
@@ -633,9 +920,9 @@ window.IFIXZ = window.IFIXZ || {};
         ],
         dashboard: {
           metrics: [
-            { key: 'pipeline', label: 'Open pipeline', type: 'sumWhereNot', field: 'value', params: { values: ['Won', 'Lost'] } },
+            { key: 'pipeline', label: 'Open pipeline', type: 'sumWhereNot', field: 'value', params: { by: 'stage', values: ['Won', 'Lost'] } },
             { key: 'open', label: 'Open opportunities', type: 'countWhereNot', field: 'stage', params: { values: ['Won', 'Lost'] } },
-            { key: 'won', label: 'Won value', type: 'sumWhere', field: 'value', params: { status: 'Won' } },
+            { key: 'won', label: 'Won value', type: 'sumWhereIn', field: 'value', params: { by: 'stage', values: ['Won'] } },
             { key: 'accounts', label: 'Accounts mirrored', type: 'distinct', field: 'accountId' }
           ],
           trend: { field: 'value', label: 'Deal value touched per day', type: 'sum', bucket: 'day', days: 14 },
@@ -689,20 +976,8 @@ window.IFIXZ = window.IFIXZ || {};
         id: 'REJ-0183', moduleId: 'ims', source: 'bulk', receivedAt: minutesAgoIso(64),
         payload: { sku: 'SKU-1005', itemName: 'Thermal receipt printer', qty: 12, warehouse: 'Cebu Main', unitCost: 7300, updatedAt: daysAgoIso(1, 10) },
         reasons: [{ ruleId: 'ims-r6', field: 'sku', message: 'SKU + warehouse must be unique in the central database (existing IMS-SKU-1005-2)', value: 'SKU-1005' }]
-      },
-      {
-        id: 'REJ-0182', moduleId: 'sales-operation', source: 'bulk', receivedAt: minutesAgoIso(38),
-        payload: { orderRef: 'SO-90277', customer: 'Cebu Agri Coop', region: 'Cebu', amount: 0, status: 'Open', placedAt: daysAgoIso(0, 11) },
-        reasons: [
-          { ruleId: 'so-r4', field: 'region', message: 'Region must be one of NCR, Luzon, Visayas, Mindanao', value: 'Cebu' },
-          { ruleId: 'so-r3', field: 'amount', message: 'Amount must be at least 1', value: '0' }
-        ]
-      },
-      {
-        id: 'REJ-0181', moduleId: 'sales-operation', source: 'bulk', receivedAt: minutesAgoIso(38),
-        payload: { orderRef: '', customer: 'Bicol Marine Corp.', region: 'Luzon', amount: 24500, status: 'Invoiced', placedAt: daysAgoIso(0, 12) },
-        reasons: [{ ruleId: 'so-r1', field: 'orderRef', message: 'Order ref is required', value: '(empty)' }]
-      },
+      }
+    ].concat(seedDealRejects(), [
       {
         id: 'REJ-0180', moduleId: 'billing-api', source: 'sync', receivedAt: minutesAgoIso(7),
         payload: { invoiceNo: 'INV-2026-0142', customer: 'Pampanga Packaging', amount: 'n/a', status: 'Sent', issuedAt: daysAgoIso(0, 9) },
@@ -720,6 +995,27 @@ window.IFIXZ = window.IFIXZ || {};
         id: 'REJ-0178', moduleId: 'support-desk', source: 'sync', receivedAt: minutesAgoIso(96),
         payload: { ticketId: '', subject: 'Need a copy of last month invoice', priority: 'Normal', status: 'Pending', contactEmail: 'l.mercado@ifixz.co', openedAt: daysAgoIso(0, 13) },
         reasons: [{ ruleId: 'sup-r1', field: 'ticketId', message: 'Ticket ID is required', value: '(empty)' }]
+      }
+    ]);
+  }
+
+  function seedDealRejects() {
+    return [
+      {
+        id: 'REJ-0182', moduleId: 'sales-operation', source: 'bulk', receivedAt: minutesAgoIso(38),
+        payload: { dealNo: 'DL-2026-0277', customer: 'Cebu Agri Coop', track: 'Private', region: 'Cebu', sku: 'SKU-1005', qty: 4, amount: 0, stage: 'New Deal', createdAt: daysAgoIso(0, 11) },
+        reasons: [
+          { ruleId: 'so-r4', field: 'region', message: 'Region must be one of NCR, Luzon, Visayas, Mindanao', value: 'Cebu' },
+          { ruleId: 'so-r3', field: 'amount', message: 'Deal value must be at least 1', value: '0' }
+        ]
+      },
+      {
+        id: 'REJ-0181', moduleId: 'sales-operation', source: 'bulk', receivedAt: minutesAgoIso(38),
+        payload: { dealNo: '', customer: 'Bicol Marine Corp.', track: 'Private', region: 'Luzon', sku: 'SKU-1077', qty: 6, amount: 24500, stage: 'New Deal', createdAt: daysAgoIso(0, 12) },
+        reasons: [
+          { ruleId: 'so-r1', field: 'dealNo', message: 'Deal no. is required', value: '(empty)' },
+          { ruleId: 'so-r7', field: 'sku', message: 'Item SKU must exist in IMS', value: 'SKU-1077' }
+        ]
       }
     ];
   }
@@ -863,6 +1159,18 @@ window.IFIXZ = window.IFIXZ || {};
           if (compositeKey(mod.records[j], rule) === key) { clash = mod.records[j]; break; }
         }
         if (clash) reasons.push({ ruleId: rule.id, field: rule.field, message: rule.label + ' (existing record ' + clash.id + ')', value: text });
+      } else if (rule.type === 'reference') {
+        /* Cross-module key: the value must exist in another module's field
+           in the central database (e.g. a deal's SKU must be an IMS SKU). */
+        var state = NS.Store && NS.Store.state;
+        var target = state && rule.params ? moduleById(state, rule.params.module) : null;
+        if (target) {
+          var found = false;
+          for (var t = 0; t < target.records.length; t++) {
+            if (String(target.records[t][rule.params.field]) === String(raw)) { found = true; break; }
+          }
+          if (!found) reasons.push({ ruleId: rule.id, field: rule.field, message: rule.label, value: text });
+        }
       } else if (rule.type === 'format') {
         var kind = rule.params && rule.params.kind;
         var bad = false;
@@ -894,19 +1202,29 @@ window.IFIXZ = window.IFIXZ || {};
     var i, n, total = 0, count = 0;
     var seen = {};
     var params = metric.params || {};
+    /* `by` names the field the values are matched against when it differs
+       from the field being summed (e.g. sum amount where stage is …). */
+    var by = params.by || metric.field;
     switch (metric.type) {
       case 'count':
         return rows.length;
       case 'countWhere':
         for (i = 0; i < rows.length; i++) {
-          if (params.values.indexOf(String(rows[i][metric.field])) !== -1) count++;
+          if (params.values.indexOf(String(rows[i][by])) !== -1) count++;
         }
         return count;
       case 'countWhereNot':
         for (i = 0; i < rows.length; i++) {
-          if (params.values.indexOf(String(rows[i][metric.field])) === -1) count++;
+          if (params.values.indexOf(String(rows[i][by])) === -1) count++;
         }
         return count;
+      case 'sumWhereIn':
+        for (i = 0; i < rows.length; i++) {
+          if (params.values.indexOf(String(rows[i][by])) === -1) continue;
+          n = numeric(rows[i][metric.field]);
+          if (!isNaN(n)) total += n;
+        }
+        return total;
       case 'sum':
         for (i = 0; i < rows.length; i++) {
           if (!matchesExtras(rows[i], params)) continue;
@@ -923,7 +1241,7 @@ window.IFIXZ = window.IFIXZ || {};
         return total;
       case 'sumWhereNot':
         for (i = 0; i < rows.length; i++) {
-          if (params.values.indexOf(String(rows[i][metric.field])) !== -1) continue;
+          if (params.values.indexOf(String(rows[i][by])) !== -1) continue;
           n = numeric(rows[i][metric.field]);
           if (!isNaN(n)) total += n;
         }
@@ -979,9 +1297,14 @@ window.IFIXZ = window.IFIXZ || {};
       d.setDate(start.getDate() + i);
       buckets.push({ key: dayKeyOf(d), label: MONTHS[d.getMonth()] + ' ' + d.getDate(), value: 0 });
     }
+    /* Bucket by the record's date, not the summed field: older configs carry
+       no dateField, so fall back to the first date field in the schema. */
+    var dateKey = cfg.dateField;
+    for (i = 0; !dateKey && i < mod.schema.length; i++) if (mod.schema[i].type === 'date') dateKey = mod.schema[i].key;
+    if (!dateKey) dateKey = cfg.field;
     for (i = 0; i < mod.records.length; i++) {
       var row = mod.records[i];
-      var when = new Date(row[cfg.field]);
+      var when = new Date(row[dateKey]);
       if (isNaN(when.getTime())) continue;
       var key = dayKeyOf(when);
       for (k = 0; k < buckets.length; k++) {
@@ -1011,8 +1334,9 @@ window.IFIXZ = window.IFIXZ || {};
 
   var SHARED_METRICS = [
     { key: 'records', label: 'Records in central database', unit: 'records', note: 'Validated records from every active module' },
-    { key: 'revenue', label: 'Billed & invoiced value', unit: '', note: 'Sales Operation (excl. cancelled) + Billing API (excl. draft)' },
-    { key: 'openWork', label: 'Open work items', unit: 'items', note: 'Open sales orders + open support tickets' },
+    { key: 'revenue', label: 'Won & invoiced value', unit: '', note: 'Sales Operation deals from Deal Won onward + Billing API (excl. draft)' },
+    { key: 'openWork', label: 'Open work items', unit: 'items', note: 'Deals not yet Done or Lost + open support tickets' },
+    { key: 'receivables', label: 'Receivables (unpaid / terms)', unit: '', note: 'Delivered deals still awaiting payment — visible to Accounting' },
     { key: 'payroll', label: 'Gross payroll (all synced periods)', unit: '', note: 'Payroll Export file sync' },
     { key: 'coverage', label: 'Modules reporting', unit: '', note: 'Active modules with a reachable or last-synced source' }
   ];
@@ -1039,7 +1363,7 @@ window.IFIXZ = window.IFIXZ || {};
       var sales = moduleById(state, 'sales-operation');
       if (sales && sales.status === 'active') {
         for (r = 0; r < sales.records.length; r++) {
-          if (sales.records[r].status === 'Cancelled') continue;
+          if (WON_STAGES.indexOf(String(sales.records[r].stage)) === -1) continue;
           var sv = numeric(sales.records[r].amount);
           if (!isNaN(sv)) sum += sv;
         }
@@ -1057,13 +1381,24 @@ window.IFIXZ = window.IFIXZ || {};
     if (key === 'openWork') {
       var so = moduleById(state, 'sales-operation');
       if (so && so.status === 'active') {
-        for (r = 0; r < so.records.length; r++) if (String(so.records[r].status) === 'Open') sum++;
+        for (r = 0; r < so.records.length; r++) if (CLOSED_STAGES.indexOf(String(so.records[r].stage)) === -1) sum++;
       }
       var sd = moduleById(state, 'support-desk');
       if (sd && sd.status === 'active') {
         for (r = 0; r < sd.records.length; r++) {
           var st = String(sd.records[r].status);
           if (st === 'Open' || st === 'Pending') sum++;
+        }
+      }
+      return sum;
+    }
+    if (key === 'receivables') {
+      var deals = moduleById(state, 'sales-operation');
+      if (deals && deals.status === 'active') {
+        for (r = 0; r < deals.records.length; r++) {
+          if (String(deals.records[r].stage) !== 'Unpaid / Terms') continue;
+          var dv = numeric(deals.records[r].amount);
+          if (!isNaN(dv)) sum += dv;
         }
       }
       return sum;
@@ -1126,7 +1461,9 @@ window.IFIXZ = window.IFIXZ || {};
       if (!mod.dashboard) mod.dashboard = {};
       if (seed.dashboard.panels) mod.dashboard.panels = seed.dashboard.panels;
       if (seed.dashboard.metrics) mod.dashboard.metrics = seed.dashboard.metrics;
+      if (seed.dashboard.trend) mod.dashboard.trend = seed.dashboard.trend;
     }
+    this.migrateDeals(byId['sales-operation']);
     /* V2 one-time pass: hide the four extra modules so the workspace starts
        with IMS and Sales only. Runs once — a module re-activated later from
        the registry keeps its status across reloads. Records are untouched. */
@@ -1166,6 +1503,26 @@ window.IFIXZ = window.IFIXZ || {};
       }
     }
     if (!this.state.movements) this.state.movements = seedMovements(mod);
+  };
+
+  /* V3 deal-lifecycle migration: browsers saved before the deal lifecycle
+     hold flat sales orders (Open / Invoiced / Closed). Swap in the deal
+     schema, rules, dashboard and seeded deals once; earlier order-shaped
+     rejects no longer match the schema, so they are replaced too. */
+  Store.prototype.migrateDeals = function (seed) {
+    var mod = moduleById(this.state, 'sales-operation');
+    if (!mod || !seed) return;
+    for (var f = 0; f < mod.schema.length; f++) if (mod.schema[f].key === 'stage') return;
+    var keep = ['schema', 'rules', 'dashboard', 'description', 'version', 'sharedMetrics', 'permissions', 'events', 'records'];
+    for (var k = 0; k < keep.length; k++) mod[keep[k]] = seed[keep[k]];
+    var ims = moduleById(this.state, 'ims');
+    if (ims) stockReceivedDeals(ims, mod.records);
+    this.state.rejected = this.state.rejected.filter(function (row) {
+      return !(row.moduleId === 'sales-operation' && row.payload && row.payload.orderRef !== undefined);
+    }).concat(seedDealRejects());
+    this.state.inbound = this.state.inbound.filter(function (item) { return item.moduleId !== 'sales-operation'; });
+    this.log('Module upgraded', 'Sales Operation 2.0.0 — orders replaced by the deal lifecycle (New Deal to Done)', 'module');
+    this.persist();
   };
 
   Store.prototype.persist = function () {
@@ -1273,7 +1630,7 @@ window.IFIXZ = window.IFIXZ || {};
     return 'REJ-' + (max + 1);
   }
 
-  function buildInbound(mod, source, count) {
+  function buildInbound(mod, source, count, firstDealNo) {
     var rows = [];
     var base = Date.now();
     for (var i = 0; i < count; i++) {
@@ -1300,6 +1657,16 @@ window.IFIXZ = window.IFIXZ || {};
         else if (field.key === 'employee') row[field.key] = 'New hire ' + intBetween(1, 40);
         else row[field.key] = 'Sample value ' + intBetween(100, 999);
       }
+      if (mod.id === 'sales-operation') {
+        /* A lead batch only ever creates New Deals for SKUs IMS carries. */
+        var item = pick(ITEMS);
+        row.dealNo = 'DL-2026-' + ('0000' + (firstDealNo + i)).slice(-4);
+        row.customer = row.track === 'Government' ? pick(GOV_CLIENTS) : pick(COMPANIES);
+        row.sku = item[0];
+        row.qty = intBetween(1, 24);
+        row.amount = Math.max(100, Math.round((row.qty * item[2] * 1.25) / 100) * 100);
+        row.stage = 'New Deal';
+      }
       if (maybe(0.14)) {
         var target = pick(mod.schema);
         var defect = intBetween(1, 3);
@@ -1315,6 +1682,22 @@ window.IFIXZ = window.IFIXZ || {};
     return rows;
   }
 
+  /* Deals that pass validation start their lifecycle: follow-up counter and
+     the first history entry, so every deal can be walked to Done. */
+  function prepareIngested(mod, row, actor) {
+    if (mod.id !== 'sales-operation') return;
+    row.id = row.dealNo; /* unique — rule so-r2 rejects duplicate deal numbers */
+    if (row.followUps === undefined) row.followUps = 0;
+    if (!row.history) {
+      row.history = [{
+        at: row._ingestedAt, from: '', to: row.stage,
+        action: row._source === 'native' ? 'Deal entered in the workspace' : 'Deal created from a lead batch',
+        actor: actor, note: ''
+      }];
+    }
+    row.updatedAt = row._ingestedAt;
+  }
+
   Store.prototype.runPipeline = function (opts) {
     var mod = this.module(opts.moduleId);
     if (!mod) return null;
@@ -1326,7 +1709,7 @@ window.IFIXZ = window.IFIXZ || {};
       };
     }
     var count = opts.source === 'bulk' ? intBetween(24, 48) : intBetween(10, 26);
-    var inbound = buildInbound(mod, opts.source, count);
+    var inbound = buildInbound(mod, opts.source, count, Number(this.nextDealNo().slice(-4)));
     var passed = [];
     var failed = [];
     var started = Date.now();
@@ -1338,6 +1721,7 @@ window.IFIXZ = window.IFIXZ || {};
       if (reasons.length === 0) {
         row._ingestedAt = isoOf(new Date());
         row.id = String(row[firstKey]) + '-' + (mod.records.length + 1);
+        prepareIngested(mod, row, 'Bitrix24 lead batch');
         passed.push(row);
       } else {
         failed.push({
@@ -1408,6 +1792,7 @@ window.IFIXZ = window.IFIXZ || {};
         row._source = 'native';
         row._ingestedAt = isoOf(new Date());
         row.id = String(row[firstKey]) + '-' + (mod.records.length + 1);
+        prepareIngested(mod, row, this.role().person.name);
         mod.records.push(row);
         passed++;
       } else {
@@ -1454,6 +1839,7 @@ window.IFIXZ = window.IFIXZ || {};
         row.payload._ingestedAt = isoOf(new Date());
         var firstKey = mod.schema.length ? mod.schema[0].key : 'id';
         row.payload.id = String(row.payload[firstKey]) + '-' + (mod.records.length + 1);
+        prepareIngested(mod, row.payload, this.role().person.name);
         mod.records.push(row.payload);
         this.state.rejected.splice(i, 1);
         this.log('Rejected record accepted', mod.name + ' — ' + row.id + ' passed on re-validation', 'pipeline');
@@ -1890,8 +2276,266 @@ window.IFIXZ = window.IFIXZ || {};
     return { ok: true, movement: movement, record: rec, delta: delta };
   };
 
+  /* ---- deal lifecycle (Sales Operation + IMS) ---- */
+
+  Store.prototype.deals = function () {
+    var mod = this.module('sales-operation');
+    return mod ? mod.records : [];
+  };
+
+  Store.prototype.deal = function (id) {
+    var list = this.deals();
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  };
+
+  Store.prototype.dealStage = function (deal) {
+    return STAGE_BY_LABEL[deal && deal.stage] || STAGE_BY_KEY['new'];
+  };
+
+  Store.prototype.nextDealNo = function () {
+    var max = 0;
+    var list = this.deals();
+    for (var i = 0; i < list.length; i++) {
+      var m = /^DL-2026-(\d+)$/.exec(String(list[i].dealNo || ''));
+      if (m && Number(m[1]) > max) max = Number(m[1]);
+    }
+    return 'DL-2026-' + ('0000' + (max + 1)).slice(-4);
+  };
+
+  /* Accounting's credit check: unpaid / terms balances the same client still
+     owes on other deals, read straight from the central database. */
+  Store.prototype.creditCheck = function (deal) {
+    var out = { balance: 0, count: 0, deals: [] };
+    var list = this.deals();
+    for (var i = 0; i < list.length; i++) {
+      var d = list[i];
+      if (d.id === deal.id || d.customer !== deal.customer || d.stage !== 'Unpaid / Terms') continue;
+      var v = numeric(d.amount);
+      if (!isNaN(v)) out.balance += v;
+      out.count++;
+      out.deals.push(d.dealNo);
+    }
+    return out;
+  };
+
+  /* Stock vs. order: IMS lines for the deal's SKU, per warehouse. */
+  Store.prototype.skuStock = function (sku) {
+    var ims = this.module('ims');
+    var out = { name: '', total: 0, lines: [] };
+    var item = itemOf(sku);
+    if (item) out.name = item[1];
+    if (!ims) return out;
+    for (var i = 0; i < ims.records.length; i++) {
+      var rec = ims.records[i];
+      if (rec.sku !== sku) continue;
+      var q = numeric(rec.qty);
+      if (isNaN(q)) q = 0;
+      if (!out.name) out.name = rec.itemName;
+      out.total += q;
+      out.lines.push({ id: rec.id, warehouse: rec.warehouse, qty: q });
+    }
+    return out;
+  };
+
+  Store.prototype.skuOptions = function () {
+    var ims = this.module('ims');
+    var seen = {};
+    var out = [];
+    if (!ims) return out;
+    for (var i = 0; i < ims.records.length; i++) {
+      var rec = ims.records[i];
+      if (seen[rec.sku]) continue;
+      seen[rec.sku] = true;
+      out.push({ value: rec.sku, label: rec.sku + ' — ' + rec.itemName });
+    }
+    out.sort(function (a, b) { return a.value.localeCompare(b.value); });
+    return out;
+  };
+
+  Store.prototype.dealCounts = function () {
+    var map = {};
+    for (var s = 0; s < DEAL_STAGES.length; s++) map[DEAL_STAGES[s].label] = { count: 0, value: 0 };
+    var list = this.deals();
+    for (var i = 0; i < list.length; i++) {
+      var slot = map[list[i].stage];
+      if (!slot) continue;
+      slot.count++;
+      var v = numeric(list[i].amount);
+      if (!isNaN(v)) slot.value += v;
+    }
+    return map;
+  };
+
+  /* The next steps a deal can take from its stage, each with whether the
+     current role may take it now and, if not, the reason and the remedy. */
+  Store.prototype.dealActions = function (deal) {
+    var stage = this.dealStage(deal);
+    var flow = DEAL_FLOW[stage.key];
+    var ids = typeof flow === 'function' ? flow(deal) : (flow || []);
+    var mod = this.module('sales-operation');
+    var followUps = Number(deal.followUps) || 0;
+    var ordinals = ['1st', '2nd', '3rd'];
+    var out = [];
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i];
+      var def = DEAL_ACTIONS[id];
+      var reason = '';
+      if (!mod || mod.status !== 'active') reason = 'Sales Operation is deactivated. Activate it from the registry to move deals.';
+      else if (def.perm && !this.can(def.perm)) reason = 'Only the General Manager approves deals. Switch to General manager from the account menu.';
+      else if (!this.can('inputRecords')) reason = 'Your role is read-only for deals. Switch to Department employee or General manager from the account menu.';
+      else if (id === 'followup' && followUps >= 3) reason = 'All three follow-ups are logged. Mark the client confirmed, or move the deal to Pending.';
+      else if (id === 'noAnswer' && followUps < 3) reason = 'Available after the 3rd follow-up — ' + followUps + ' of 3 logged.';
+      out.push({
+        id: id,
+        label: id === 'followup' ? 'Log ' + ordinals[Math.min(followUps, 2)] + ' follow-up' : def.label,
+        to: STAGE_BY_KEY[def.to].label,
+        icon: def.icon,
+        tone: def.tone || '',
+        primary: !!def.primary,
+        help: def.help,
+        fields: def.fields || [],
+        noteRequired: !!def.noteRequired,
+        enabled: !reason,
+        reason: reason
+      });
+    }
+    return out;
+  };
+
+  function ensureStockLine(ims, sku, warehouse) {
+    for (var i = 0; i < ims.records.length; i++) {
+      if (ims.records[i].sku === sku && ims.records[i].warehouse === warehouse) return ims.records[i];
+    }
+    var item = itemOf(sku);
+    var name = item ? item[1] : sku;
+    var cost = item ? item[2] : 0;
+    for (i = 0; i < ims.records.length; i++) {
+      if (ims.records[i].sku === sku) { name = ims.records[i].itemName; cost = ims.records[i].unitCost; break; }
+    }
+    var suffix = ims.records.length + 1;
+    var id = 'IMS-' + sku + '-R' + suffix;
+    var clash = true;
+    while (clash) {
+      clash = false;
+      for (i = 0; i < ims.records.length; i++) if (ims.records[i].id === id) { clash = true; break; }
+      if (clash) { suffix++; id = 'IMS-' + sku + '-R' + suffix; }
+    }
+    var line = {
+      id: id, sku: sku, itemName: name, qty: 0, reorderPoint: 12, warehouse: warehouse, unitCost: cost,
+      updatedAt: isoOf(new Date()), _source: 'native', _ingestedAt: isoOf(new Date())
+    };
+    ims.records.push(line);
+    return line;
+  }
+
+  /* Move a deal one arrow along the board. Returns { ok:false, field,
+     message } with a cause-and-remedy message, or { ok:true, deal, from,
+     summary }. RR posting receives stock into IMS; delivery issues it. */
+  Store.prototype.advanceDeal = function (dealId, actionId, input) {
+    input = input || {};
+    var deal = this.deal(dealId);
+    if (!deal) return { ok: false, field: '', message: 'This deal is no longer in the central database. Close the dialog and reopen it from the queue.' };
+    var available = this.dealActions(deal);
+    var act = null;
+    var i;
+    for (i = 0; i < available.length; i++) if (available[i].id === actionId) act = available[i];
+    if (!act) return { ok: false, field: '', message: 'That step is not available while the deal is in ' + deal.stage + '.' };
+    if (!act.enabled) return { ok: false, field: '', message: act.reason };
+    var def = DEAL_ACTIONS[actionId];
+
+    var values = {};
+    var fields = def.fields || [];
+    for (i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      var v = String(input[f.name] === undefined || input[f.name] === null ? '' : input[f.name]).trim();
+      if (f.required && !v) return { ok: false, field: f.name, message: f.label + ' is required to ' + act.label.toLowerCase() + '.' };
+      if (v && f.options && f.options.indexOf(v) === -1) return { ok: false, field: f.name, message: 'Pick one of the listed options for ' + f.label.toLowerCase() + '.' };
+      values[f.name] = v;
+    }
+    var note = String(input.note || '').trim();
+    if (def.noteRequired && !note) return { ok: false, field: 'note', message: 'Add a note explaining this decision — it stays in the deal history.' };
+
+    var docs = { poNo: 'PO number', rrNo: 'RR number', siNo: 'SI / WR number' };
+    var list = this.deals();
+    for (var key in docs) {
+      if (!Object.prototype.hasOwnProperty.call(docs, key) || !values[key]) continue;
+      values[key] = values[key].toUpperCase();
+      for (i = 0; i < list.length; i++) {
+        if (list[i].id !== deal.id && String(list[i][key] || '').toUpperCase() === values[key]) {
+          return { ok: false, field: key, message: docs[key] + ' ' + values[key] + ' is already on ' + list[i].dealNo + '. Each deal needs its own number.' };
+        }
+      }
+    }
+
+    if (actionId === 'credit') {
+      var cc = this.creditCheck(deal);
+      if (cc.balance > 0 && !note) {
+        return {
+          ok: false, field: 'note',
+          message: deal.customer + ' still owes ₱' + Math.round(cc.balance).toLocaleString('en-US') + ' on ' + cc.count + ' unpaid / terms deal' + (cc.count === 1 ? '' : 's') +
+            '. Add a note on why this deal may proceed, or leave it in Accounting.'
+        };
+      }
+    }
+
+    var ims = this.module('ims');
+    var qty = numeric(deal.qty);
+    var issueLine = null;
+    if (actionId === 'rr' && !ims) return { ok: false, field: '', message: 'IMS is not registered, so the RR cannot receive stock.' };
+    if (actionId === 'paid' || actionId === 'terms') {
+      if (ims) {
+        for (i = 0; i < ims.records.length; i++) {
+          if (ims.records[i].sku === deal.sku && ims.records[i].warehouse === deal.warehouse) { issueLine = ims.records[i]; break; }
+        }
+      }
+      var onHand = issueLine ? numeric(issueLine.qty) : 0;
+      if (isNaN(onHand)) onHand = 0;
+      if (!issueLine || onHand < qty) {
+        return {
+          ok: false, field: '',
+          message: 'Only ' + onHand + ' units of ' + deal.sku + ' are on hand in ' + (deal.warehouse || 'the receiving warehouse') +
+            ' and this deal delivers ' + qty + '. Receive or transfer stock in IMS before delivering.'
+        };
+      }
+    }
+
+    var from = deal.stage;
+    var now = isoOf(new Date());
+    if (actionId === 'followup') deal.followUps = (Number(deal.followUps) || 0) + 1;
+    var stored = ['poNo', 'rrNo', 'warehouse', 'docType', 'siNo', 'terms', 'bidRef'];
+    for (i = 0; i < stored.length; i++) if (values[stored[i]]) deal[stored[i]] = values[stored[i]];
+    if (def.to === 'lost') deal.lostReason = values.reason || def.lostReason || 'Other';
+    if (def.to === 'done') deal.paidAt = now;
+    deal.stage = STAGE_BY_KEY[def.to].label;
+    deal.updatedAt = now;
+
+    var summary = dealSummary(actionId, deal, values);
+    if (!deal.history) deal.history = [];
+    deal.history.push({ at: now, from: from, to: deal.stage, action: summary, actor: this.role().person.name, note: note });
+
+    if (actionId === 'rr') {
+      var line = ensureStockLine(ims, deal.sku, deal.warehouse);
+      this.stockMovement('ims', { type: 'receive', recordId: line.id, qty: qty, ref: deal.rrNo, note: 'Received for ' + deal.dealNo });
+    } else if (issueLine) {
+      this.stockMovement('ims', { type: 'issue', recordId: issueLine.id, qty: qty, ref: deal.siNo, note: 'Delivered on ' + deal.dealNo });
+    }
+
+    this.log(summary, 'Sales Operation — ' + deal.dealNo + ' · ' + deal.customer + ' → ' + deal.stage, 'deal');
+    this.emit({ type: 'deal', dealId: deal.id });
+    return { ok: true, deal: deal, from: from, summary: summary };
+  };
+
   NS.Store = new Store();
   NS.ROLES = ROLES;
+  NS.DEALS = {
+    stages: DEAL_STAGES,
+    stageByKey: STAGE_BY_KEY,
+    stageByLabel: STAGE_BY_LABEL,
+    closed: CLOSED_STAGES,
+    tracks: DEAL_TRACKS,
+    glossary: DEAL_GLOSSARY
+  };
   NS.ADAPTERS = ADAPTERS;
   NS.SCHEMA_PRESETS = SCHEMA_PRESETS;
   NS.SHARED_METRICS = SHARED_METRICS;

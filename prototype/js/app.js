@@ -123,7 +123,7 @@
     var html = '<div class="menu-head"><p>' + UI.esc(role.person.name) + '</p>' +
       '<span>' + UI.esc(role.label) + ' · ' + UI.esc(role.blurb) + '</span></div>' +
       '<p class="menu-label">View as</p>';
-    var ids = ['org_admin', 'user', 'super_admin'];
+    var ids = ['org_admin', 'user', 'approver', 'super_admin'];
     for (var i = 0; i < ids.length; i++) {
       var item = ROLES[ids[i]];
       var active = ids[i] === role.id;

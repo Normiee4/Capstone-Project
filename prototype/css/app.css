@@ -128,7 +128,10 @@ button, [role='button'], a[href], summary, label[for] { cursor: pointer; }
   line-height: 1.35;
 }
 
-.sidebar-close { display: none; margin-left: auto; }
+/* .icon-btn (declared later) sets display:inline-grid; the doubled class
+   outranks it so the drawer controls stay hidden while the sidebar is pinned. */
+.sidebar-close { margin-left: auto; }
+.icon-btn.sidebar-close, .icon-btn.nav-toggle { display: none; }
 
 .sidebar-nav { padding: var(--space-4) var(--space-3); overflow-y: auto; }
 
@@ -224,7 +227,6 @@ button, [role='button'], a[href], summary, label[for] { cursor: pointer; }
 }
 
 .topbar-actions { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; }
-.nav-toggle { display: none; }
 
 .view { padding: var(--space-6); }
 .view:focus { outline: none; }
@@ -512,7 +514,10 @@ button, [role='button'], a[href], summary, label[for] { cursor: pointer; }
 
 /* ---------------------------------------------------------------- tables -- */
 
-.table-wrap { width: 100%; overflow-x: auto; }
+/* position: relative keeps absolutely positioned .sr-only text in cells that
+   are scrolled off to the right inside the wrapper, instead of letting it
+   widen the whole page. */
+.table-wrap { position: relative; width: 100%; overflow-x: auto; }
 table.data {
   width: 100%;
   border-collapse: collapse;
@@ -666,6 +671,7 @@ th.sortable:hover { color: var(--accent); }
   color: var(--danger-text);
   font-size: var(--text-sm);
 }
+.form-summary svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
 .form-summary ul { display: grid; gap: 4px; margin-top: 4px; }
 .form-summary a { color: var(--danger-text); font-weight: 700; text-decoration: underline; }
 
@@ -891,14 +897,18 @@ th.sortable:hover { color: var(--accent); }
     box-shadow: var(--shadow-pop);
   }
   .shell.nav-open .sidebar { transform: translateX(0); }
-  .sidebar-close { display: inline-grid; }
-  .nav-toggle { display: inline-grid; }
+  .icon-btn.sidebar-close, .icon-btn.nav-toggle { display: inline-grid; }
   .view { padding: var(--space-5); }
   .topbar { padding: var(--space-3) var(--space-4); }
 }
 
 @media (max-width: 767px) {
-  .metric-grid { grid-template-columns: minmax(0, 1fr); }
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+  .metric { padding: var(--space-4); border-radius: var(--radius-md); }
+  .metric-label { letter-spacing: 0.02em; overflow-wrap: anywhere; }
+  .metric-value { font-size: var(--text-xl); }
+  .page-title { font-size: var(--text-lg); }
+  .topbar { padding: var(--space-3) var(--space-4); gap: var(--space-3); }
   .form-grid, .choice-grid { grid-template-columns: minmax(0, 1fr); }
   .account-text { display: none; }
   .page-sub { display: none; }
