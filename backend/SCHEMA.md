@@ -52,7 +52,10 @@ This document describes the **platform core** schema: authentication and RBAC, t
 | Column | Type | Key | Description |
 |---|---|---|---|
 | id | string | PK | |
-| name | string | | Seeded: `super_admin`, `dept_head`, `dept_employee` |
+| name | string | | Seeded: `super_admin`, `dept_head`, `dept_employee` 
+|description | string 
+|status | enum | Seeded: 'active' / 'inactive'
+
 
 ### `users`
 
