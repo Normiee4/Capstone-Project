@@ -3,99 +3,84 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Laravel\Sanctum\HasApiTokens; // 1. Import the Sanctum trait
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    // 2. Add the HasApiTokens trait
     use HasApiTokens, HasFactory, Notifiable;
 
-    /**
-     * The primary key is a string, not an auto-incrementing integer.
-     */
     protected $primaryKey = 'id';
-    public $incrementing = false;      // Disable auto-incrementing
-    protected $keyType = 'string';     // Declare the key type as string
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
+    public $incrementing = true;
+
+    protected $keyType = 'int';
+
     protected $fillable = [
         'name',
         'email',
-        'password_hash',   // Your custom column name
+        'password',
         'role_id',
         'department_id',
+        'status',
+        'invited_at',
+        'last_login_at',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
-        'password_hash', // Hide this from JSON responses
+        'password',
         'remember_token',
     ];
 
-    /**
-     * Get the password for the user.
-     * This tells Laravel's authentication system to look at 'password_hash'.
-     */
-    public function getAuthPassword()
-    {
-        return $this->password_hash;
-    }
-
-    /**
-     * Get the name of the password attribute for the user.
-     * This is used by `Auth::attempt()`.
-     */
-    public function getAuthPasswordName()
-    {
-        return 'password_hash';
-    }
-
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
-            'password_hash' => 'hashed', // Automatically hash passwords when set
+            'password' => 'hashed',
             'email_verified_at' => 'datetime',
+            'invited_at' => 'datetime',
+            'last_login_at' => 'datetime',
         ];
     }
 
-    // --- Relationships ---
-
-
-    public function role()
+    public function getAuthPassword()
     {
-        // Define the relationship to the Role model which is a belongsTo relationship since each user has one role.
-        // belongsTo methods works like foreign key relationship where the foreign key is in the users table and references the primary key in the roles table.
-        return $this->belongsTo(Role::class, 'role_id');
+        return $this->password;                // ← was $this->password_hash
     }
 
-    public function department()
-    {   
-        return $this->belongsTo(Department::class, 'department_id');
-    }   
+    public function getAuthPasswordName()
+    {
+        return 'password';
+    }
 
-    // public function registeredModules(): HasMany
-    // {
-    //     return $this->hasMany(Module::class, 'registered_by');
-    // }
+    // ── Relationships ──────────────────────────────
 
-    // public function eventLogs(): HasMany
-    // {
-    //     return $this->hasMany(EventLog::class, 'user_id');
-    // }
+    public function role(): BelongsTo
+    {
+        return $this->belongsTo(Role::class, 'role_id', 'role_id');
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class, 'department_id', 'department_id');
+    }
+
+    // ── Authorization helper ───────────────────────
+
+    public function hasPermission(string $action, string $moduleId, string $requiredScope = 'own'): bool
+    {
+        $acceptableScopes = match ($requiredScope) {
+            'own' => ['own', 'department', 'all'],
+            'department' => ['department', 'all'],
+            'all' => ['all'],
+            default => [],
+        };
+
+        return Permission::where('role_id', $this->role_id)
+            ->where('action', $action)
+            ->whereIn('module_id', [$moduleId, '*'])
+            ->whereIn('scope', $acceptableScopes)
+            ->exists();
+    }
 }

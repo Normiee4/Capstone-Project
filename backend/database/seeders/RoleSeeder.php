@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Role;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class RoleSeeder extends Seeder
@@ -13,8 +12,8 @@ class RoleSeeder extends Seeder
      */
     public function run(): void
     {
-       
-    // 1. I defined an array of roles with their respective description and status
+
+        // 1. I defined an array of roles with their respective description and status
         $roles = [
             [
                 'role_name' => 'super_admin',
@@ -30,18 +29,18 @@ class RoleSeeder extends Seeder
                 'role_name' => 'employee',
                 'role_description' => 'Employee role with consolidated access to the platform',
                 'role_status' => 'active',
-            ]
+            ],
         ];
 
-
-    // A loop that will run per each role in the array and create a new role in the database if it does not already exist. 
-    // The firstOrCreate method is used to check if a role with the same name already exists in the database, and if not, it will create a new role with the specified description and status.
+        // A loop that will run per each role in the array and create a new role in the database if it does not already exist.
+        // The firstOrCreate method is used to check if a role with the same name already exists in the database, and if not, it will create a new role with the specified description and status.
         foreach ($roles as $role) {
             Role::firstOrCreate(
-                
-            ['role_name' => $role['role_name']],
-            ['role_description' => $role['role_description']],
-            ['role_status' => $role['role_status']]
+                ['role_name' => $role['role_name']],
+                [
+                    'role_description' => $role['role_description'],
+                    'role_status' => $role['role_status'],
+                ]
             );
         }
     }

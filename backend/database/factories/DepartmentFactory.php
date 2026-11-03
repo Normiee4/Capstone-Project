@@ -15,8 +15,8 @@ class DepartmentFactory extends Factory
      *
      * @return array<string, mixed>
      */
-
     protected $model = Department::class;
+
     public function definition(): array
     {
         return [
@@ -26,10 +26,11 @@ class DepartmentFactory extends Factory
             'department_status' => 'active',
         ];
     }
+
     public function inactive(): static
-        {
-            return $this->state(fn (array $attributes) => [
-                'department_status' => 'inactive',
-            ]);
-        }
+    {
+        return $this->state(fn (array $attributes) => [
+            'department_status' => 'inactive',
+        ]);
+    }
 }

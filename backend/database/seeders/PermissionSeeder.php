@@ -40,10 +40,10 @@ class PermissionSeeder extends Seeder
 
         foreach ($grants as $g) {
             Permission::firstOrCreate([
-                'role_id'   => $roles[$g['role']],
+                'role_id' => $roles[$g['role']],
                 'module_id' => $g['module'],
-                'action'    => $g['action'],
-                'scope'     => $g['scope'],
+                'action' => $g['action'],
+                'scope' => $g['scope'],
             ]);
         }
     }
