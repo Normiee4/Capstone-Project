@@ -3,6 +3,7 @@
 namespace App\Modules\IAM\Services;
 
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -36,18 +37,16 @@ class AuthService
             ]);
         }
 
-        // check if user is active
         if ($user->status !== 'active') {
             $this->audit->log('login.blocked', $user, ['reason' => $user->status]);
 
-            throw ValidationException::withMessages([
-                'email' => ['Your account is '.$user->status.'.'],
-            ]);
+            throw new AuthorizationException('Account is not active.');
         }
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
         $user->forceFill(['last_login_at' => now()])->save();
+        $user->loadMissing('role.permissions');
 
         $this->audit->log('login.success', $user);
 

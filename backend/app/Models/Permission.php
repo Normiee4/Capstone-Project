@@ -18,26 +18,15 @@ class Permission extends Model
 
     public $incrementing = true;
 
-    protected $fillable =
-        [
-            'permission_name',
-            'permission_description',
-            'permission_status',
-            'role_id',
-            'module_id',
-            'action',
-            'scope',
-        ];
+    protected $fillable = [
+        'role_id',
+        'action',
+        'scope',
+    ];
 
-    public $timestamps = true;
-
-    // typecasts or attribute casting for the permission_status field into string data type
-    protected $casts =
-        [
-            'permission_status' => 'string',
-            'action' => 'string',
-            'scope' => 'string',
-        ];
+    protected $casts = [
+        'scope' => 'string',
+    ];
 
     public function role(): BelongsTo
     {

@@ -36,9 +36,9 @@ This document describes the **platform core** schema: authentication and RBAC, t
 
 | Role | Layer it operates on |
 |---|---|
-| `super_admin` | Module registry and pipeline only (register, activate, deactivate, delete modules, run ETL, configure adapters). Never touches department data. |
-| `dept_head` | Full CRUD on their department's module data, with department scope. |
-| `dept_employee` | CRUD on their department's module data, with narrower (own) scope as configured. |
+| `super_admin` | Platform governance: user/role/permission administration, invitations, and audit. No business-record access. |
+| `dept_head` | Department-scoped user administration (invite/view/update/disable employees) plus workspace operations: module integration and schema, pipelines, backups, and monitoring. |
+| `employee` | Department-scoped business execution: view/add/update/archive records and approve workflow steps within their own department. |
 
 ### `departments`
 
@@ -51,22 +51,25 @@ This document describes the **platform core** schema: authentication and RBAC, t
 
 | Column | Type | Key | Description |
 |---|---|---|---|
-| id | string | PK | |
-| name | string | | Seeded: `super_admin`, `dept_head`, `dept_employee` 
-|description | string 
-|status | enum | Seeded: 'active' / 'inactive'
+| role_id | bigint | PK | |
+| role_name | string | unique | Seeded: `super_admin`, `dept_head`, `employee` |
+| role_description | text | | |
+| role_status | enum | | `active` / `inactive` |
 
 
 ### `users`
 
 | Column | Type | Key | Description |
 |---|---|---|---|
-| id | string | PK | |
+| id | bigint | PK | Auto-incrementing |
 | name | string | | |
-| email | string | | Login identifier; should be unique |
-| password_hash | string | | Hashed password; never store plain text |
-| role_id | string | FK → roles.id | |
-| department_id | string | FK → departments.id | Null for `super_admin` |
+| email | string | unique | Login identifier |
+| password | string | | Hashed password; never store plain text |
+| status | enum | | `invited` / `active` / `suspended` |
+| role_id | bigint | FK → roles.role_id | Nullable |
+| department_id | bigint | FK → departments.department_id | Null for `super_admin` |
+| invited_at | timestamp | | Set when an invitation is issued |
+| last_login_at | timestamp | | Updated on successful login |
 
 Access tokens are managed by Laravel Sanctum, not stored here.
 
@@ -74,13 +77,17 @@ Access tokens are managed by Laravel Sanctum, not stored here.
 
 | Column | Type | Key | Description |
 |---|---|---|---|
-| id | string | PK | |
-| role_id | string | FK → roles.id | |
-| module_id | string | FK → modules.id | Null means all modules |
-| action | enum | | Registry actions: `register`, `activate`, `deactivate`, `delete`, `run_pipeline`, `configure_adapter`. Data actions: `create`, `read`, `update`, `archive`. |
-| scope | enum | | `own`, `department`, `all` |
+| permission_id | bigint | PK | |
+| role_id | bigint | FK → roles.role_id | The role holding the capability |
+| action | string | | Action name, e.g. `users.view`, `records.approve` |
+| scope | enum | | `all` or `department` |
 
-Recommended constraint: unique on (`role_id`, `module_id`, `action`).
+Unique constraint: (`role_id`, `action`).
+
+A grant states **what** a role may do (`action`) and **how wide** (`scope`).
+`department` scope is enforced against the target record by comparing the
+actor's `department_id` with the record's `department_id`. The action
+catalog is defined in `app/Support/Action.php`.
 
 ## 4. Module registry and adapters
 
@@ -217,10 +224,9 @@ Current state of a tracked business process, built from its events.
 
 | From | To | Cardinality | Notes |
 |---|---|---|---|
-| users.role_id | roles.id | many → one | |
-| users.department_id | departments.id | many → one | Null for super admin |
-| permissions.role_id | roles.id | many → one | |
-| permissions.module_id | modules.id | many → one | Null = all modules |
+| users.role_id | roles.role_id | many → one | |
+| users.department_id | departments.department_id | many → one | Null for super admin |
+| permissions.role_id | roles.role_id | many → one | |
 | modules.department_id | departments.id | many → one | |
 | modules.registered_by | users.id | many → one | |
 | adapters.module_id | modules.id | many → one | A native module has none; an integrated module can have several |
@@ -272,19 +278,21 @@ roles [icon: shield, color: red] {
 }
 
 users [icon: user, color: orange] {
-  id string pk
+  id bigint pk
   name string
   email string
-  password_hash string
-  role_id string
-  department_id string
+  password string
+  status enum
+  role_id bigint
+  department_id bigint
+  invited_at timestamp
+  last_login_at timestamp
 }
 
 permissions [icon: lock, color: green] {
-  id string pk
-  role_id string
-  module_id string
-  action enum
+  permission_id bigint pk
+  role_id bigint
+  action string
   scope enum
 }
 
@@ -371,10 +379,9 @@ operation_tracker [icon: activity, color: red] {
 }
 
 // ═════════ RELATIONSHIPS ═════════
-users.role_id > roles.id
-users.department_id > departments.id
-roles.id < permissions.role_id
-modules.id < permissions.module_id
+users.role_id > roles.role_id
+users.department_id > departments.department_id
+roles.role_id < permissions.role_id
 departments.id < modules.department_id
 users.id < modules.registered_by
 modules.id < adapters.module_id

@@ -74,6 +74,6 @@ class LoginTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $response->assertStatus(422)->assertJsonValidationErrors('email');
+        $response->assertForbidden()->assertJson(['message' => 'Account is not active.']);
     }
 }

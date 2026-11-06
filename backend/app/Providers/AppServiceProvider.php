@@ -2,10 +2,13 @@
 
 namespace App\Providers;
 
+use App\Models\User;
+use App\Support\Action;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -27,9 +30,15 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
-        Gate::define('iam.users.view',   fn ($u) => $u->hasPermission('read',   'iam', 'all'));
-        Gate::define('iam.users.create', fn ($u) => $u->hasPermission('create', 'iam', 'all'));
-        Gate::define('iam.users.update', fn ($u) => $u->hasPermission('update', 'iam', 'all'));
-        Gate::define('iam.users.delete', fn ($u) => $u->hasPermission('delete', 'iam', 'all'));
+        RateLimiter::for('login', function (Request $request) {
+            return Limit::perMinute(5)->by($request->input('email').'|'.$request->ip());
+        });
+
+        foreach (Action::all() as $action) {
+            Gate::define(
+                $action,
+                fn (User $user, ?Model $target = null) => $user->hasAction($action, $target),
+            );
+        }
     }
 }

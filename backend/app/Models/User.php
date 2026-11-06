@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -46,15 +47,13 @@ class User extends Authenticatable
 
     public function getAuthPassword()
     {
-        return $this->password;                // ← was $this->password_hash
+        return $this->password;
     }
 
     public function getAuthPasswordName()
     {
         return 'password';
     }
-
-    // ── Relationships ──────────────────────────────
 
     public function role(): BelongsTo
     {
@@ -66,21 +65,30 @@ class User extends Authenticatable
         return $this->belongsTo(Department::class, 'department_id', 'department_id');
     }
 
-    // ── Authorization helper ───────────────────────
-
-    public function hasPermission(string $action, string $moduleId, string $requiredScope = 'own'): bool
+    /**
+     * Check whether the user's active role holds an action grant and, when a
+     * target record is supplied and the grant is department-scoped, whether
+     * that record belongs to the user's own department.
+     */
+    public function hasAction(string $action, ?Model $target = null): bool
     {
-        $acceptableScopes = match ($requiredScope) {
-            'own' => ['own', 'department', 'all'],
-            'department' => ['department', 'all'],
-            'all' => ['all'],
-            default => [],
-        };
+        $role = $this->role;
 
-        return Permission::where('role_id', $this->role_id)
-            ->where('action', $action)
-            ->whereIn('module_id', [$moduleId, '*'])
-            ->whereIn('scope', $acceptableScopes)
-            ->exists();
+        if ($role === null || $role->role_status !== 'active') {
+            return false;
+        }
+
+        $grant = $role->permissions->firstWhere('action', $action);
+
+        if ($grant === null) {
+            return false;
+        }
+
+        if ($grant->scope === 'all' || $target === null) {
+            return true;
+        }
+
+        return $this->department_id !== null
+            && $this->department_id === $target->department_id;
     }
 }

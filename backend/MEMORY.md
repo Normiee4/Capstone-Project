@@ -1,104 +1,69 @@
-# MEMORY — Backend Progress
+# MEMORY — Backend Progress (Kanban)
 
-Last updated: 2026-11-03
-Branch: `fix/auth-login-hashing-500`
-Covers: last two sessions (IAM user CRUD audit, re-review, deferral decisions).
+Last updated: 2026-11-06
+Branch: `fix/auth-login-hashing-500` (IAM action/permission work ported here from `iam/roles-and-permissions`)
+Board covers: auth flow, role→action authorization, user CRUD guardrails.
 
-## Current state
+**Today's focus:** run migrations + seed + tests, then implement the invite flow.
 
-Auth (login / logout / me) works and is covered by `tests/Feature/Auth/`.
-IAM user CRUD was added but is **not functional**: routes lack model binding and
-auth, `index` is unreachable, and create/update gates cannot pass for any role.
-Nothing is committed; the new IAM files are untracked.
+Legend: `[DONE]` `[DOING]` `[TODO]` `[BACKLOG]` `[BLOCKED]`
 
-## Files in play
+---
 
-Modified:
-- `app/Modules/IAM/Services/AuditService.php` — `Auth::id()` → `auth('sanctum')->id()`
-- `app/Providers/AppServiceProvider.php` — four `iam.users.*` gates
-- `bootstrap/app.php` — comments only (routing/middleware unchanged)
-- `routes/api.php` — user routes added (still broken, see below)
+## [DONE]
 
-New (untracked):
-- `app/Http/Controllers/UserController.php`
-- `app/Http/Requests/StoreUserRequest.php`
-- `app/Http/Requests/UpdateUserRequest.php`
-- `app/Modules/IAM/Services/UserService.php`
+- **AUTH-01 — Auth API works.** Login / logout / me; JSON 401 for guests.
+- **AUTH-02 — Password chain.** `password` column + `'password' => 'hashed'` cast + `Hash::check`; unhashed legacy passwords are rejected as validation errors.
+- **AUTH-03 — Active-user gate.** `user.active` alias; non-active token → 403 `Account is not active.`
+- **AUTH-04 — Suspended login.** Returns 403, matching the flowchart.
+- **IAM-01 — User CRUD scaffolding.** Controller, requests, resource, service, audit.
+- **IAM-02 — Actions model.**
+  - `app/Support/Action.php` — fixed catalog of action strings (`users.view`, `records.approve`, …).
+  - `permissions` table is `(role_id, action, scope)` with unique `(role_id, action)`; `roles.role_name` unique.
+  - `User::hasAction($action, ?Model $target = null)` reads the role's mounted grants.
+  - `AppServiceProvider` defines one Gate per action.
+- **IAM-03 — Routes.** `/users` inside `auth:sanctum` + `user.active`, protected by `can:<action>[,<target>]`.
+- **IAM-04 — Guardrails.** Department Head is department-scoped; cannot escalate role/department; Super Admin cannot delete self or the last Super Admin.
+- **DOC-01 — SCHEMA §3 updated.** Users are bigint + `password` + status/timestamps; permissions are action/scope.
 
-Deleted (correctly): `backend/toArray())` — shell parse-error garbage.
+---
+
+## [DOING]
+
+- **IAM-05 — Tests written, not run.** `tests/Feature/Auth/*` and `tests/Feature/IAM/UserAuthorizationTest.php` cover the flowchart branches. PHP is unavailable on the agent PATH (ENV-01).
+
+---
+
+## [TODO] — P0
+
+- **VERIFY-01 — Run migrations + seed + tests.**
+  - `php artisan migrate` then `php artisan db:seed --class=PermissionSeeder`, or `php artisan migrate:fresh --seed`.
+  - Then `php artisan test`.
+- **IAM-06 — Invite flow.** `UserService::invite()` still empty but typed `: User`. Implement single-use email link (72h). `POST /users` is currently Super Admin direct-create only (`users.create`).
+- **IAM-07 — Disable/archive endpoints.** Actions exist; no routes/controller actions yet.
+
+---
+
+## [BACKLOG]
+
+- **DOC-02 — Remaining docs drift.** Module tables still reference `module_id` FKs that don't exist yet.
+- **PERM-01 — Per-module data permissions.** Deferred; current action names encode the module area.
+- **PERM-02 — `own` scope.** Not needed yet; department is the boundary.
+- **MOD-01 — Module Registry v1.** No `Module`/`Adapter` models, migrations, or routes.
+
+---
 
 ## Verified facts
 
-- Password chain is consistent: Request plain password → `User` `'password' => 'hashed'`
-  cast → `Hash::check` in `AuthService`; `getAuthPassword()` returns `password`.
-- Sanctum registers `auth.guards.sanctum` at runtime
-  (`vendor/laravel/sanctum/src/SanctumServiceProvider.php:24-27`), so
-  `auth('sanctum')->id()` in `AuditService` resolves. Login-failure audits log `null` (intended).
-- `user.active` alias is registered (`bootstrap/app.php:21`); suspended token → 403 JSON.
-- Guest hitting a `can:` route → 403 (Gate returns false for a required-arg closure, no 500).
-- `UserController` injects `UserService`, so create/update/delete now emit audit events.
-- Eloquent `update()` on a non-existing model returns `false` (no insert); `delete()` on a
-  non-existing model is a no-op — so unresolved route models fail silently, they do not corrupt data.
-- Seeded roles: `super_admin`, `dept_head`, `employee`. Docs (`SCHEMA.md`) say `dept_employee` — drift.
-
-## Blockers / bugs (priority order)
-
-1. **`routes/api.php` user routes are broken (P0).**
-   - Outside the `auth:sanctum` + `user.active` group → `can:` evaluates as guest → 403 for everyone.
-   - No `{user}` route parameter on show/update/destroy → no route-model binding; a fresh
-     empty `User` is injected. `show` returns an empty resource, `update` returns false then
-     logs `user.updated` with a null subject, `destroy` no-ops and still returns
-     "User deleted successfully".
-   - `GET /users` points at `show`, not `index`; `index` is unreachable. No list endpoint.
-   - Stale `use App\Http\Controllers\AuditLogController;` (class does not exist until deferred work resumes).
-2. **Gate ↔ seeder mismatch (P0).** Gates demand `hasPermission(..., 'iam', 'all')`, but no seeded
-   grant satisfies create/update:
-   - super_admin: `read * all` only → no create/update
-   - dept_head: `create/update * department` → scope `all` fails
-   - employee: create/update only on `ims`/`sales`, `read * department`
-   Result: view passes for admin/head; delete only for head; create/update for nobody.
-3. **`UpdateUserRequest` blocks legitimate updates (P0).** `password` is `required`
-   (forces a reset on every edit) and `unique:users,email` lacks
-   `Rule::unique('users','email')->ignore($this->route('user'))` → saving an unchanged email returns 422.
-4. **`UserService::invite()` is empty but typed `: User`** (`UserService.php:39`) → TypeError if called.
-5. **Missing authorization/scoping on records.** No gate in the controller/requests; no
-   department scoping on `show/update/destroy` → IDOR for any authenticated user. `index`
-   returns all users to every role (employee `read * department` never enforced), has no
-   pagination, and N+1s `role`/`department` in `UserResource`.
-6. Minor: `AuditService.php:13` trailing whitespace; hard-coded `sanctum` guard.
-7. Docs drift: `permissions.module_id` uses `'*'` wildcard in code but `SCHEMA.md:79` says
-   FK → `modules.id` (table not migrated); `'iam'` is not a registered module.
+- `hasAction()` is the single authorization primitive: active role → grant lookup → `all` bypass or `department_id` comparison.
+- Gates receive an optional target: `can:users.update,user` passes the bound model; `can:users.view` checks the action only.
+- Seeded roles: `super_admin`, `dept_head`, `employee`.
+- No Policies: authorization is uniform role→action→scope, so policies would be boilerplate for now.
 
 ## Decisions
 
-- **Defer audit-log scaffolding** (model, controller, factory, migration, resource, request).
-  Keep `AuditService` as log-only; remove the unused `AuditLogController` import when routes are touched.
-- **Next area: Module Registry** (SCHEMA §4), not more IAM polish.
-
-## Next: Module Registry
-
-Docs reference it but nothing exists: no `Module`/`Adapter` models, migrations, or controller;
-`app/Modules/Integration` and `app/Modules/Lifecycle` are empty. Registry actions already exist in
-the `permissions.action` enum (`register`, `activate`, `deactivate`, `delete`, `run_pipeline`,
-`configure_adapter`).
-
-Candidate v1 scope:
-- `modules`: name, slug (unique), `module_type` (native|integrated), `status_flag`
-  (registered|active|inactive), `department_id`, `pipeline_rules` json, `registered_date`,
-  `registered_by` → users, `last_synced`.
-- `adapters`: module FK, name, type (file|db|api|webhook), `config` json, `credential_ref`
-  (single-table inheritance).
-- `module_tables` + `module_columns`: only if the schema feature is in v1 (droppable later).
-- Registry service + gates (`modules.view/create/register/activate/deactivate/delete`) wired to
-  `hasPermission`, with seeds that actually satisfy the gates this time.
-- Routes under `/api/v1/modules` with `auth:sanctum` + `user.active` + `can:`.
-- Defer: provisioning DDL / dynamic tables, pipelines, event log.
-
-## Test tooling
-
-Tinker + cURL suites were produced; PHP is not on the agent PATH (`php` not found in this bash),
-so run them from a normal terminal.
-- Tinker: per-role `Gate::forUser(...)->allows(...)`; `UserService` create/update/delete with
-  `Hash::check` + `storage/logs/laravel.log` audit grep; `invite()` TypeError check;
-  `UpdateUserRequest` email-uniqueness check; `config('auth.guards.sanctum')`.
-- cURL: login → `TOKEN`, `/auth/me` 200/401, suspended 403, user CRUD (currently 403 / empty / no-op).
+- Keep three immutable roles; Super Admin assigns roles and edits role-action mappings.
+- Scope is `all` vs `department` (`own` deferred).
+- Super Admin has no business-record access.
+- Bigint `id` and Laravel's `password` column are the standard.
+- Suspended/invited login returns 403, not 422.

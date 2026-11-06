@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateUserRequest extends FormRequest
 {
@@ -12,7 +13,7 @@ class UpdateUserRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        return true; // route-level ability + controller guardrails
     }
 
     /**
@@ -24,11 +25,17 @@ class UpdateUserRequest extends FormRequest
     {
         return [
             'name'          => ['required', 'string', 'max:255'],
-            'email'         => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password'      => ['required', 'string', 'min:8'],
-            'role_id'       => ['nullable', 'integer', 'exists:roles,role_id'],
-            'department_id' => ['nullable', 'integer', 'exists:departments,department_id'],
-            'status'        => ['nullable', 'in:invited,active,suspended'],
-        ]; 
+            'email'         => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($this->route('user')),
+            ],
+            'password'      => ['sometimes', 'string', 'min:8'],
+            'role_id'       => ['sometimes', 'nullable', 'integer', 'exists:roles,role_id'],
+            'department_id' => ['sometimes', 'nullable', 'integer', 'exists:departments,department_id'],
+            'status'        => ['sometimes', 'nullable', 'in:invited,active,suspended'],
+        ];
     }
 }

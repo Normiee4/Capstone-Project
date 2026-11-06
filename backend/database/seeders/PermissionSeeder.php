@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Permission;
 use App\Models\Role;
+use App\Support\Action;
 use Illuminate\Database\Seeder;
 
 class PermissionSeeder extends Seeder
@@ -12,39 +13,56 @@ class PermissionSeeder extends Seeder
     {
         $roles = Role::pluck('role_id', 'role_name');
 
-        $grants = [
-            // ── Super Admin: read everything ──────────────────────
-            ['role' => 'super_admin', 'module' => '*', 'action' => 'read', 'scope' => 'all'],
-
-            // ── Department Head ───────────────────────────────────
-            ['role' => 'dept_head', 'module' => '*', 'action' => 'read',              'scope' => 'all'],
-            ['role' => 'dept_head', 'module' => '*', 'action' => 'register',          'scope' => 'all'],
-            ['role' => 'dept_head', 'module' => '*', 'action' => 'activate',          'scope' => 'all'],
-            ['role' => 'dept_head', 'module' => '*', 'action' => 'deactivate',        'scope' => 'all'],
-            ['role' => 'dept_head', 'module' => '*', 'action' => 'delete',            'scope' => 'all'],
-            ['role' => 'dept_head', 'module' => '*', 'action' => 'run_pipeline',      'scope' => 'all'],
-            ['role' => 'dept_head', 'module' => '*', 'action' => 'configure_adapter', 'scope' => 'all'],
-            ['role' => 'dept_head', 'module' => '*', 'action' => 'create',            'scope' => 'department'],
-            ['role' => 'dept_head', 'module' => '*', 'action' => 'update',            'scope' => 'department'],
-            ['role' => 'dept_head', 'module' => '*', 'action' => 'archive',           'scope' => 'department'],
-
-            // ── Department Employee ───────────────────────────────
-            ['role' => 'employee', 'module' => 'ims',   'action' => 'create',  'scope' => 'own'],
-            ['role' => 'employee', 'module' => 'ims',   'action' => 'update',  'scope' => 'own'],
-            ['role' => 'employee', 'module' => 'ims',   'action' => 'archive', 'scope' => 'own'],
-            ['role' => 'employee', 'module' => 'sales', 'action' => 'create',  'scope' => 'own'],
-            ['role' => 'employee', 'module' => 'sales', 'action' => 'update',  'scope' => 'own'],
-            ['role' => 'employee', 'module' => 'sales', 'action' => 'archive', 'scope' => 'own'],
-            ['role' => 'employee', 'module' => '*',     'action' => 'read',    'scope' => 'department'],
+        $matrix = [
+            'super_admin' => [
+                Action::USERS_VIEW => 'all',
+                Action::USERS_INVITE => 'all',
+                Action::USERS_CREATE => 'all',
+                Action::USERS_UPDATE => 'all',
+                Action::USERS_DISABLE => 'all',
+                Action::USERS_ARCHIVE => 'all',
+                Action::USERS_DELETE => 'all',
+                Action::ROLES_ASSIGN => 'all',
+                Action::PERMISSIONS_MANAGE => 'all',
+                Action::AUDIT_VIEW => 'all',
+            ],
+            'dept_head' => [
+                Action::USERS_VIEW => 'department',
+                Action::USERS_INVITE => 'department',
+                Action::USERS_UPDATE => 'department',
+                Action::USERS_DISABLE => 'department',
+                Action::MODULES_MANAGE => 'all',
+                Action::PIPELINE_RUN => 'all',
+                Action::BACKUPS_MANAGE => 'all',
+                Action::MONITORING_VIEW => 'all',
+            ],
+            'employee' => [
+                Action::MONITORING_VIEW => 'department',
+                Action::RECORDS_VIEW => 'department',
+                Action::RECORDS_CREATE => 'department',
+                Action::RECORDS_UPDATE => 'department',
+                Action::RECORDS_ARCHIVE => 'department',
+                Action::RECORDS_APPROVE => 'department',
+            ],
         ];
 
-        foreach ($grants as $g) {
-            Permission::firstOrCreate([
-                'role_id' => $roles[$g['role']],
-                'module_id' => $g['module'],
-                'action' => $g['action'],
-                'scope' => $g['scope'],
-            ]);
+        foreach ($matrix as $roleName => $actions) {
+            $roleId = $roles[$roleName] ?? null;
+
+            if ($roleId === null) {
+                continue;
+            }
+
+            Permission::where('role_id', $roleId)
+                ->whereNotIn('action', array_keys($actions))
+                ->delete();
+
+            foreach ($actions as $action => $scope) {
+                Permission::updateOrCreate(
+                    ['role_id' => $roleId, 'action' => $action],
+                    ['scope' => $scope],
+                );
+            }
         }
     }
 }

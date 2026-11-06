@@ -2,7 +2,10 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -32,6 +35,25 @@ class AuthRoutesTest extends TestCase
             ->getJson('/api/v1/auth/me')
             ->assertOk()
             ->assertJsonPath('email', 'me@example.com');
+    }
+
+    public function test_me_returns_role_and_actions(): void
+    {
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+
+        $user = User::factory()->create([
+            'role_id' => Role::where('role_name', 'employee')->value('role_id'),
+            'status' => 'active',
+        ]);
+        $token = $user->createToken('test')->plainTextToken;
+
+        $response = $this->withToken($token)
+            ->getJson('/api/v1/auth/me')
+            ->assertOk()
+            ->assertJsonPath('role', 'employee');
+
+        $this->assertContains('records.view', $response->json('actions'));
     }
 
     public function test_logout_returns_unauthorized_without_a_token(): void
