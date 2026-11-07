@@ -88,6 +88,10 @@ class User extends Authenticatable
             return true;
         }
 
+        if ($grant->scope === 'own') {
+            return (int) $this->getKey() === (int) $target->getKey();
+        }
+
         return $this->department_id !== null
             && $this->department_id === $target->department_id;
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\LoginRequest;
+use App\Http\Requests\RefreshTokenRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Modules\IAM\Services\AuthService;
@@ -24,7 +25,21 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => new UserResource($result['user']),
-            'token' => $result['token'],
+            'access_token' => $result['access_token'],
+            'refresh_token' => $result['refresh_token'],
+            'expires_in' => $result['expires_in'],
+        ]);
+    }
+
+    public function refresh(RefreshTokenRequest $request): JsonResponse
+    {
+        $result = $this->authService->refresh($request->validated('refresh_token'));
+
+        return response()->json([
+            'user' => new UserResource($result['user']),
+            'access_token' => $result['access_token'],
+            'refresh_token' => $result['refresh_token'],
+            'expires_in' => $result['expires_in'],
         ]);
     }
 
@@ -34,7 +49,7 @@ class AuthController extends Controller
         $user = Auth::user();
 
         if ($user) {
-            $this->authService->logout($user);
+            $this->authService->logout($user, $request->input('refresh_token'));
         }
 
         return response()->json(['message' => 'Logged out successfully.']);
@@ -47,4 +62,5 @@ class AuthController extends Controller
 
         return response()->json(new UserResource($user));
     }
+
 }

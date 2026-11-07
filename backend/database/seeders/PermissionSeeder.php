@@ -38,11 +38,11 @@ class PermissionSeeder extends Seeder
             ],
             'employee' => [
                 Action::MONITORING_VIEW => 'department',
-                Action::RECORDS_VIEW => 'department',
-                Action::RECORDS_CREATE => 'department',
-                Action::RECORDS_UPDATE => 'department',
-                Action::RECORDS_ARCHIVE => 'department',
-                Action::RECORDS_APPROVE => 'department',
+                Action::RECORDS_VIEW => 'own',
+                Action::RECORDS_CREATE => 'own',
+                Action::RECORDS_UPDATE => 'own',
+                Action::RECORDS_ARCHIVE => 'own',
+                Action::RECORDS_APPROVE => 'own',
             ],
         ];
 
