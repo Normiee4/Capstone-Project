@@ -20,6 +20,8 @@ final class Action
 
     public const USERS_UPDATE = 'users.update';
 
+    public const USERS_RESET_PASSWORD = 'users.reset_password';
+
     public const USERS_DISABLE = 'users.disable';
 
     public const USERS_ARCHIVE = 'users.archive';
@@ -62,6 +64,7 @@ final class Action
             self::USERS_INVITE,
             self::USERS_CREATE,
             self::USERS_UPDATE,
+            self::USERS_RESET_PASSWORD,
             self::USERS_DISABLE,
             self::USERS_ARCHIVE,
             self::USERS_DELETE,
