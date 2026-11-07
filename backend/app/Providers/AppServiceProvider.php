@@ -34,11 +34,13 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->input('email').'|'.$request->ip());
         });
 
-        foreach (Action::all() as $action) {
-            Gate::define(
-                $action,
-                fn (User $user, ?Model $target = null) => $user->hasAction($action, $target),
-            );
-        }
+       foreach (Action::all() as $action) {
+            Gate::define($action, function (User $user, ?Model $target = null) use ($action) {
+                
+                // Pass the action name and the optional target model to your RBAC system
+                return $user->hasAction($action, $target);
+                
+            });
+        }   
     }
 }

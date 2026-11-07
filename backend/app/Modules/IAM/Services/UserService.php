@@ -38,6 +38,6 @@ class UserService
 
     public function invite(string $email, int $roleId, ?int $departmentId): User
     {
-            
+        throw new \LogicException('IAM-06: invite flow not implemented.');
     }
 }

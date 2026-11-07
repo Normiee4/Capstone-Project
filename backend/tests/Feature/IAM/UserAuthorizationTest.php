@@ -57,6 +57,15 @@ class UserAuthorizationTest extends TestCase
         $this->assertFalse($this->actor('employee', $this->deptA)->hasAction(Action::USERS_VIEW));
     }
 
+    public function test_employee_own_scope_only_matches_the_actor(): void
+    {
+        $employee = $this->employee($this->deptA);
+        $teammate = $this->employee($this->deptA);
+
+        $this->assertTrue($employee->hasAction(Action::RECORDS_UPDATE, $employee));
+        $this->assertFalse($employee->hasAction(Action::RECORDS_UPDATE, $teammate));
+    }
+
     public function test_super_admin_can_list_all_users(): void
     {
         $this->employee($this->deptA);
