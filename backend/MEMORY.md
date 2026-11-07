@@ -1,12 +1,12 @@
 # MEMORY — Backend Progress (Kanban)
 
 Last updated: 2026-11-07
-Branch: `fix/auth-login-hashing-500` (IAM action/permission work ported here from `iam/roles-and-permissions`)
+Branch: `auth/reset-pass` (stacked on `auth/refresh-token`; `main` still lacks the auth/IAM chain)
 Board covers: auth flow, token lifecycle, invite/verification, role→action authorization, user CRUD guardrails, audit.
 
 **Where we left off (2026-11-07):** AUTH-06 is complete. Expiry middleware removed (Sanctum enforces per-token `expires_at`); `POST /auth/refresh` rotates the pair; logout revokes the refresh token. Suite green: **30 passed / 75 assertions**.
 
-**Today's focus:** Authentication, Authorization, and User Management are done. Next P0 is IAM-06 (invite flow), then AUTH-05 (password reset).
+**Today's focus:** Authentication, Authorization, User Management, and password reset are done. Next P0 is IAM-06 (invite flow).
 
 Legend: `[DONE]` `[DOING]` `[TODO]` `[BACKLOG]` `[BLOCKED]`
 
@@ -34,7 +34,12 @@ Legend: `[DONE]` `[DOING]` `[TODO]` `[BACKLOG]` `[BLOCKED]`
   - No expiry middleware: Sanctum's guard rejects an expired `expires_at` (`Guard.php:126-130`). `config/sanctum.php` `expiration` stays `null` so it does not cap refresh tokens at 15 min.
   - Refresh rejects access tokens reused as refresh tokens (`*` ability would otherwise match), expired/unknown tokens, and suspended users — all 401.
   - Logout deletes the current access token and the supplied `refresh_token`; without it, all of the user's refresh tokens are revoked (all sessions).
-- **IAM-05 — Test suite.** **30 passed / 75 assertions** (`php artisan test`).
+- **AUTH-05 — Password reset (super-admin mediated).**
+  - `POST /auth/password-reset-request` (public): generic 200; notifies all Super Admins; unknown email does nothing.
+  - `POST /users/{user}/password-reset` (`can:users.reset_password`): Super Admin sends the user a Laravel broker reset link.
+  - `POST /auth/reset-password` (public): consumes the broker token, sets the password, revokes all user tokens.
+  - No OTP and no new table: uses `password_reset_tokens` + `Password` broker. New action `users.reset_password` (super_admin only).
+- **IAM-05 — Test suite.** **36 passed / 88 assertions** (`php artisan test`).
 
 ---
 
@@ -49,7 +54,6 @@ Legend: `[DONE]` `[DOING]` `[TODO]` `[BACKLOG]` `[BLOCKED]`
 - **VERIFY-01 — Run migrations + seed + tests.**
   - `php artisan migrate` then `php artisan db:seed --class=PermissionSeeder`, or `php artisan migrate:fresh --seed`.
   - Then `php artisan test` (currently 30/30).
-- **AUTH-05 — Password reset.** `POST /auth/forgot-password` + `POST /auth/reset-password`. Use Laravel's password broker (table and `config/auth.php` broker already exist: 60 min expiry, 60s throttle). Always return the same generic response; revoke all tokens after a successful reset.
 - **IAM-06 — Invite flow + email verification.** Implement signed, single-use 72h email link; user stays `invited`; accept endpoint sets password, `email_verified_at`, and `active`. `POST /users` is currently Super Admin direct-create only (`users.create`).
   - `UserService::invite()` now throws `LogicException`; compiles, ready to implement.
 - **IAM-07 — Disable/archive endpoints.** Actions exist; no routes/controller actions yet.
@@ -85,6 +89,7 @@ Legend: `[DONE]` `[DOING]` `[TODO]` `[BACKLOG]` `[BLOCKED]`
 - Suspended/invited login returns 403, not 422.
 - Access/refresh tokens are returned in the response body (bearer auth). They must never be written to app logs or the browser console.
 - Logout is per-device when the client sends its `refresh_token`; otherwise it revokes all sessions.
+- Password reset is mediated by Super Admin (request → notify → admin sends link); no OTP. Uses the built-in broker token.
 
 ## Hygiene
 

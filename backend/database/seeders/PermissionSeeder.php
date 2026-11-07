@@ -19,6 +19,7 @@ class PermissionSeeder extends Seeder
                 Action::USERS_INVITE => 'all',
                 Action::USERS_CREATE => 'all',
                 Action::USERS_UPDATE => 'all',
+                Action::USERS_RESET_PASSWORD => 'all',
                 Action::USERS_DISABLE => 'all',
                 Action::USERS_ARCHIVE => 'all',
                 Action::USERS_DELETE => 'all',

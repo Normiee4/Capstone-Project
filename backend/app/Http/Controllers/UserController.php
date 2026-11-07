@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Role;
 use App\Models\User;
+use App\Modules\IAM\Services\PasswordResetService;
 use App\Modules\IAM\Services\UserService;
 use App\Support\Action;
 use Illuminate\Http\JsonResponse;
@@ -15,7 +16,10 @@ use Illuminate\Http\Request;
 class UserController extends Controller
 {
     // constructor for using UserService Business Logic
-    public function __construct(private UserService $userService) {}
+    public function __construct(
+        private UserService $userService,
+        private PasswordResetService $passwordReset,
+    ) {}
 
 
     // display records with Eager Loading and Pagination
@@ -71,6 +75,13 @@ class UserController extends Controller
         $this->userService->delete($user);
 
         return response()->json(['message' => 'User deleted successfully']);
+    }
+
+    public function sendPasswordReset(User $user): JsonResponse
+    {
+        $this->passwordReset->sendLink($user);
+
+        return response()->json(['message' => 'Password reset link sent.']);
     }
 
     /**
