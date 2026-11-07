@@ -26,7 +26,7 @@ class LoginTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('user.email', 'test@example.com')
-            ->assertJsonStructure(['user', 'token']);
+            ->assertJsonStructure(['user', 'access_token', 'refresh_token', 'expires_in']);
     }
 
     public function test_login_fails_with_wrong_password(): void

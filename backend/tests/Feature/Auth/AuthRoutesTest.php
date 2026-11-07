@@ -63,6 +63,29 @@ class AuthRoutesTest extends TestCase
             ->assertJson(['message' => 'Unauthenticated.']);
     }
 
+    public function test_expired_access_token_is_rejected(): void
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('access-token', ['*'], now()->subMinute())->plainTextToken;
+
+        $this->withToken($token)
+            ->getJson('/api/v1/auth/me')
+            ->assertStatus(401);
+    }
+
+    public function test_logout_revokes_the_refresh_token(): void
+    {
+        $user = User::factory()->create();
+        $access = $user->createToken('access-token', ['*'], now()->addMinutes(15))->plainTextToken;
+        $refresh = $user->createToken('refresh-token', ['issue-access-token'], now()->addDays(30))->plainTextToken;
+
+        $this->withToken($access)
+            ->postJson('/api/v1/auth/logout', ['refresh_token' => $refresh])
+            ->assertOk();
+
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
     public function test_logout_revokes_the_current_token(): void
     {
         $user = User::factory()->create();
