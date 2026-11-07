@@ -9,10 +9,9 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-   public function up(): void
-{
-    Schema::create('permissions', function (Blueprint $table) 
+    public function up(): void
     {
+        Schema::create('permissions', function (Blueprint $table) {
             // PK matching your model's $primaryKey = 'permission_id'
             $table->id('permission_id');
 

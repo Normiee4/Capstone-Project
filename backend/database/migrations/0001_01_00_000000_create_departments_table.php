@@ -12,11 +12,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('departments', function (Blueprint $table) {
-            $table->id('department_id')->primary();
+            $table->id('department_id');
             $table->string('department_name', 100);
             $table->text('department_description')->nullable();
             $table->string('department_head', 100)->nullable();
-            $table->enum('department_status', ['active', 'inactive'])->default('active');;
+            $table->enum('department_status', ['active', 'inactive'])->default('active');
             $table->timestamps();
         });
     }

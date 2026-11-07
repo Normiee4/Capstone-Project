@@ -2,38 +2,29 @@
 
 namespace App\Models;
 
+use Database\Factories\PermissionsFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Permission extends Model
 {
-    /** @use HasFactory<\Database\Factories\PermissionsFactory> */
+    /** @use HasFactory<PermissionsFactory> */
     use HasFactory;
 
     protected $primaryKey = 'permission_id';
+
     protected $keyType = 'int';
+
     public $incrementing = true;
 
-
-    protected $fillable = 
-    [   
-        'permission_name', 
-        'permission_description', 
-        'permission_status',
+    protected $fillable = [
         'role_id',
-        'module_id',
         'action',
-        'scope'
+        'scope',
     ];
-    public $timestamps = true;  
 
-
-    // typecasts or attribute casting for the permission_status field into string data type
-    protected $casts = 
-    [
-        'permission_status' => 'string',
-        'action' => 'string',
+    protected $casts = [
         'scope' => 'string',
     ];
 
