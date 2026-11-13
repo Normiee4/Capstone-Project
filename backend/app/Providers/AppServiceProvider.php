@@ -34,6 +34,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->input('email').'|'.$request->ip());
         });
 
+        RateLimiter::for('invitation', function (Request $request) {
+            return Limit::perMinute(10)->by($request->ip());
+        });
+
        foreach (Action::all() as $action) {
             Gate::define($action, function (User $user, ?Model $target = null) use ($action) {
                 
