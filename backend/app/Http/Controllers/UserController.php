@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Modules\IAM\Services\PasswordResetService;
@@ -92,7 +93,9 @@ class UserController extends Controller
      */
     private function guardProvisioning(User $actor, array $data): void
     {
-        if ($actor->hasAction(Action::USERS_CREATE)) {
+        // scope 'all' is the super admin; a department-scoped grant may only
+        // create employees inside the actor's own department.
+        if ($this->grant($actor, Action::MANAGE_USERS)?->scope === 'all') {
             return;
         }
 
@@ -114,7 +117,7 @@ class UserController extends Controller
      */
     private function guardUpdate(User $actor, User $target, array $data): void
     {
-        if ($actor->hasAction(Action::ROLES_ASSIGN)) {
+        if ($this->grant($actor, Action::MANAGE_USERS)?->scope === 'all') {
             return;
         }
 
@@ -139,9 +142,16 @@ class UserController extends Controller
         }
     }
 
-    private function guardDelete(User $actor, User $target): void
+private function guardDelete(User $actor, User $target): void
     {
-        abort_if($actor->id === $target->id, 403, 'You may not delete your own account.');
+        abort_if($actor->id === $target->id, 403, 'You cannot delete your own account.');
+
+        // only a super admin may delete accounts
+        abort_unless(
+            $this->grant($actor, Action::MANAGE_USERS)?->scope === 'all',
+            403,
+            'You may not delete accounts.',
+        );
 
         $superAdminRoleId = Role::where('role_name', 'super_admin')->value('role_id');
 
@@ -152,5 +162,13 @@ class UserController extends Controller
 
             abort_if($otherSuperAdmins === 0, 403, 'You may not delete the last super admin.');
         }
+    }
+
+    /**
+     * The actor's grant for an action, if the actor's role has one.
+     */
+    private function grant(User $actor, string $action): ?Permission
+    {
+        return $actor->role?->permissions->firstWhere('action', $action);
     }
 }

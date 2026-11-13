@@ -12,32 +12,20 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('permissions', function (Blueprint $table) {
-            // PK matching your model's $primaryKey = 'permission_id'
-            $table->id('permission_id');
-
-            // Descriptive columns (from your model)
-            $table->string('permission_name')->nullable();
-            $table->string('permission_description')->nullable();
-            $table->string('permission_status')->default('active');
-
-            // The actual grant definition
+            $table->id('permission_id');    // or $table->id(), depending on your PK
             $table->foreignId('role_id')
                 ->constrained('roles', 'role_id')
                 ->cascadeOnDelete();
 
-            $table->string('module_id')->default('*');
-
+            $table->string('module_id')->default('*');   // ← MUST be here
             $table->enum('action', [
                 'register', 'activate', 'deactivate', 'delete',
                 'run_pipeline', 'configure_adapter',
                 'create', 'read', 'update', 'archive',
+                'invite', 'manage_users', 'reset_password',
             ]);
-
             $table->enum('scope', ['own', 'department', 'all'])->default('own');
-
             $table->timestamps();
-
-            // The tuple that actually enforces uniqueness
             $table->unique(['role_id', 'module_id', 'action'], 'permissions_role_module_action_unique');
         });
     }

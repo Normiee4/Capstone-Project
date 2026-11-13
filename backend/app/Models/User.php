@@ -73,13 +73,11 @@ class User extends Authenticatable
     public function hasAction(string $action, ?Model $target = null): bool
     {
         $role = $this->role;
-
-        if ($role === null || $role->role_status !== 'active') {
+        if ($role === null) {
             return false;
         }
 
         $grant = $role->permissions->firstWhere('action', $action);
-
         if ($grant === null) {
             return false;
         }
@@ -88,10 +86,7 @@ class User extends Authenticatable
             return true;
         }
 
-        if ($grant->scope === 'own') {
-            return (int) $this->getKey() === (int) $target->getKey();
-        }
-
+        // scope = 'department' only
         return $this->department_id !== null
             && $this->department_id === $target->department_id;
     }

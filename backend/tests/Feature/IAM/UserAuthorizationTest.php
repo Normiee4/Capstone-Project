@@ -50,20 +50,21 @@ class UserAuthorizationTest extends TestCase
 
     public function test_action_matrix_is_seeded(): void
     {
-        $this->assertTrue($this->actor('super_admin')->hasAction(Action::USERS_CREATE));
-        $this->assertTrue($this->actor('dept_head', $this->deptA)->hasAction(Action::USERS_INVITE));
-        $this->assertFalse($this->actor('dept_head', $this->deptA)->hasAction(Action::USERS_DELETE));
-        $this->assertTrue($this->actor('employee', $this->deptA)->hasAction(Action::RECORDS_APPROVE));
-        $this->assertFalse($this->actor('employee', $this->deptA)->hasAction(Action::USERS_VIEW));
+        $this->assertTrue($this->actor('super_admin')->hasAction(Action::MANAGE_USERS));
+        $this->assertTrue($this->actor('dept_head', $this->deptA)->hasAction(Action::INVITE));
+        $this->assertFalse($this->actor('dept_head', $this->deptA)->hasAction(Action::DELETE));
+        $this->assertTrue($this->actor('employee', $this->deptA)->hasAction(Action::READ));
+        $this->assertFalse($this->actor('employee', $this->deptA)->hasAction(Action::MANAGE_USERS));
     }
 
-    public function test_employee_own_scope_only_matches_the_actor(): void
+    public function test_employee_department_scope_only_matches_own_department(): void
     {
         $employee = $this->employee($this->deptA);
         $teammate = $this->employee($this->deptA);
+        $outsider = $this->employee($this->deptB);
 
-        $this->assertTrue($employee->hasAction(Action::RECORDS_UPDATE, $employee));
-        $this->assertFalse($employee->hasAction(Action::RECORDS_UPDATE, $teammate));
+        $this->assertTrue($employee->hasAction(Action::UPDATE, $teammate));
+        $this->assertFalse($employee->hasAction(Action::UPDATE, $outsider));
     }
 
     public function test_super_admin_can_list_all_users(): void

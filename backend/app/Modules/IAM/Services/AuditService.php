@@ -2,12 +2,12 @@
 
 namespace App\Modules\IAM\Services;
 
-use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 
 class AuditService
 {
-    public function log(string $event, ?User $subject = null, array $metadata = []): void
+    public function log(string $event, ?Model $subject = null, array $metadata = []): void
     {
         Log::info('audit: '.$event, [
             'user_id' => auth('sanctum')->id(),            

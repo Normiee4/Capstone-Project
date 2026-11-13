@@ -53,7 +53,7 @@ class AuthRoutesTest extends TestCase
             ->assertOk()
             ->assertJsonPath('role', 'employee');
 
-        $this->assertContains('records.view', $response->json('actions'));
+        $this->assertContains('read', $response->json('actions'));
     }
 
     public function test_logout_returns_unauthorized_without_a_token(): void
